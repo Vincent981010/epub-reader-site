@@ -1,7 +1,7 @@
 import os
 import io
 from datetime import datetime, timedelta, timezone
-from flask import Flask, request, jsonify, render_template, session, send_file
+from flask import Flask, request, jsonify, session, send_file
 import ebooklib
 from ebooklib import epub
 from bs4 import BeautifulSoup
@@ -9,7 +9,7 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from werkzeug.security import generate_password_hash, check_password_hash
 
-app = Flask(__name__, template_folder='.')
+app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'any_secret_key_for_session_security')
 
 DATABASE_URL = os.environ.get('DATABASE_URL')
@@ -90,9 +90,11 @@ def clear_expired_books(cursor):
     now = datetime.now(timezone.utc)
     cursor.execute('DELETE FROM books WHERE expires_at IS NOT NULL AND expires_at < %s', (now,))
 
+# 🌟 修正後的首頁路由：直接讀取檔案，徹底解決網頁變成純文字顯示的問題
 @app.route('/')
 def index():
-    return render_template('index.html')
+    with open('index.html', 'r', encoding='utf-8') as f:
+        return f.read()
 
 
 # ==========================================
@@ -162,7 +164,7 @@ def user_status():
 
 
 # ==========================================
-#  📚 書籍清單獲取 (核心邏輯隔離)
+#  📚 書籍清單獲取 (分流權限)
 # ==========================================
 
 @app.route('/books', methods=['GET'])
@@ -188,7 +190,7 @@ def get_books():
             ORDER BY books.id DESC
         ''', (user_id,))
     else:
-        # 未登入狀態：僅看管理員公開書籍（因為沒登入時未關聯 user_id，改由 session 或 expires 追蹤，這裡列出管理員的）
+        # 未登入狀態：僅看管理員公開書籍
         cursor.execute('''
             SELECT books.id, books.title, books.series_id, COALESCE(series.name, '未分類書籍') as series_name,
                    users.username as uploader, FALSE as is_temporary
@@ -283,7 +285,7 @@ def upload_file():
 
     return jsonify({"error": "不支援的檔案格式"}), 400
 
-# 📥 新增功能：指定書籍轉換下載為符合排版的 TXT 檔
+# 📥 核心規格：指定書籍轉換下載為符合排版的 TXT 檔
 @app.route('/books/<int:book_id>/download/txt', methods=['GET'])
 def download_txt(book_id):
     conn = get_db_connection()
@@ -304,13 +306,13 @@ def download_txt(book_id):
     cursor.close()
     conn.close()
     
-    # 依照要求格式組合文本：
+    # 📊 依照要求格式精準組合：
     # 章節標題
     # 內文
     txt_content = ""
     for ch in chapters:
         txt_content += f"{ch['title']}\n"
-        txt_content += f"{ch['content']}\n\n" # 章節間加空行便於閱讀
+        txt_content += f"{ch['content']}\n\n"
         
     # 將文字轉成記憶體串流供 Flask 送出下載
     buffer = io.BytesIO()
@@ -328,7 +330,7 @@ def download_txt(book_id):
 
 
 # ==========================================
-#  🔧 系列 (Series) 與 書籍移動 API
+#  🔧 系列 (Series) 與 書籍移動 API (管理員專屬)
 # ==========================================
 
 @app.route('/series', methods=['GET', 'POST'])
@@ -343,7 +345,7 @@ def handle_series():
         return jsonify(series_list)
         
     elif request.method == 'POST':
-        # 👑 保護設定功能：只有管理員能建立/修改系列分類標籤
+        # 👑 保護功能：只有管理員能建立系列分類
         if not session.get('is_admin'):
             return jsonify({"error": "權限不足，只有管理員可以變更系列設定"}), 403
             
@@ -366,7 +368,6 @@ def handle_series():
 
 @app.route('/books/<int:book_id>/move', methods=['PUT'])
 def move_book_series(book_id):
-    # 👑 移動書籍分類也是管理員專有設定權限
     if not session.get('is_admin'):
         return jsonify({"error": "權限不足，只有系統管理員能移動書籍櫃位"}), 403
         
