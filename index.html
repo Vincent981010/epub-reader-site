@@ -1,266 +1,289 @@
-<!DOCTYPE html>
-<html lang="zh-TW">
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>動態自訂系列雲端書櫃</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        .book-card { transition: all 0.2s; }
-        .book-card:hover { transform: translateY(-5px); box-shadow: 0 4px 15px rgba(0,0,0,0.1)!important; }
-        .read-btn { cursor: pointer; }
-        .chapter-box { max-height: 550px; overflow-y: auto; font-size: 1.1rem; line-height: 1.9; color: #2b2b2b; }
-    </style>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta http-equiv="Content-Style-Type" content="text/css">
+  <title></title>
+  <meta name="Generator" content="Cocoa HTML Writer">
+  <meta name="CocoaVersion" content="2685.3">
+  <style type="text/css">
+    body {background-color: #f6f7f9}
+    span.s1 {font-kerning: none}
+  </style>
 </head>
-<body class="bg-light">
-    <div class="container py-4">
-        <h1 class="mb-4 text-center">📚 自訂系列動態書櫃</h1>
-        
-        <!-- 操作面板：上傳書籍 & 新增自訂系列 -->
-        <div class="row g-3 mb-4">
-            <div class="col-md-7">
-                <div class="card p-3 shadow-sm bg-white h-100">
-                    <h5 class="card-title">📥 上傳新書籍</h5>
-                    <form id="uploadForm" class="d-flex gap-2 mt-2">
-                        <input type="file" class="form-control" id="epubFile" accept=".epub" required>
-                        <button type="submit" class="btn btn-primary text-nowrap" id="uploadBtn">上傳儲存</button>
-                    </form>
-                    <div id="loading" class="text-muted mt-2 d-none" style="font-size: 0.9rem;">
-                        <div class="spinner-border spinner-border-sm text-primary" role="status"></div> 正在解析書籍內容...
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-5">
-                <div class="card p-3 shadow-sm bg-white h-100">
-                    <h5 class="card-title">✨ 建立新套書/系列標籤</h5>
-                    <form id="seriesForm" class="d-flex gap-2 mt-2">
-                        <input type="text" class="form-control" id="seriesName" placeholder="例如：哈利波特、魔戒" required>
-                        <button type="submit" class="btn bg-dark text-white text-nowrap">新增系列</button>
-                    </form>
-                </div>
-            </div>
-        </div>
-
-        <!-- 第一層：動態系列標籤頁（由資料庫撈出渲染） -->
-        <div class="row">
-            <div class="col-12">
-                <div class="card p-3 shadow-sm bg-white">
-                    <ul class="nav nav-tabs mb-3" id="seriesTabs" role="tablist">
-                        <!-- 系列標籤按鈕會由 JS 動態生成 -->
-                    </ul>
-                    <div class="tab-content" id="seriesTabContent">
-                        <!-- 各系列的書籍卡片展示區會由 JS 動態生成 -->
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 第二層：書籍章節閱讀器區塊 -->
-        <div id="readerArea" class="row mt-4 d-none">
-            <div class="col-12">
-                <div class="card p-4 shadow-sm bg-white border-primary">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <div>
-                            <h2 id="bookTitle" class="m-0"></h2>
-                            <span class="badge bg-info mt-1" id="bookSeriesName"></span>
-                        </div>
-                        <button class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('readerArea').classList.add('d-none')">關閉內文 ✕</button>
-                    </div>
-                    <hr>
-                    <!-- 章節動態標籤頁 -->
-                    <ul class="nav nav-pills mb-3" id="chapterTabs" role="tablist"></ul>
-                    <div class="tab-content p-3 border rounded bg-light chapter-box" id="chapterTabContent"></div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        let globalSeries = []; // 儲存所有系列清單
-        
-        document.addEventListener('DOMContentLoaded', initializePage);
-
-        async function initializePage() {
-            await loadSeriesList(); // 先加載系列
-            await loadBooks();      // 再加載書籍並分類擺放
-        }
-
-        // 1. 從資料庫抓取自訂系列清單
-        async function loadSeriesList() {
-            const res = await fetch('/series');
-            globalSeries = await res.json();
-            
-            const tabsContainer = document.getElementById('seriesTabs');
-            const contentContainer = document.getElementById('seriesTabContent');
-            tabsContainer.innerHTML = '';
-            contentContainer.innerHTML = '';
-
-            // 動態產生大標籤頁
-            globalSeries.forEach((series, index) => {
-                const isActive = index === 0 ? 'active' : '';
-                const isShowActive = index === 0 ? 'show active' : '';
-                
-                // 渲染系列標籤頁按鈕
-                tabsContainer.innerHTML += `
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link ${isActive} fw-bold" id="series-tab-${series.id}" data-bs-toggle="tab" data-bs-target="#series-pane-${series.id}" type="button" role="tab">${series.name}</button>
-                    </li>`;
-                
-                // 渲染該系列對應的圖書容器
-                contentContainer.innerHTML += `
-                    <div class="tab-pane fade ${isShowActive}" id="series-pane-${series.id}" role="tabpanel">
-                        <div class="row row-cols-1 row-cols-md-3 g-3 mt-1" id="book-grid-${series.id}">
-                            <!-- 書籍會被分配到這裡 -->
-                        </div>
-                    </div>`;
-            });
-        }
-
-        // 2. 抓取所有書籍並塞進對應的系列標籤頁內
-        async function loadBooks() {
-            const res = await fetch('/books');
-            const books = await res.json();
-
-            // 先清空所有系列的網格
-            globalSeries.forEach(s => {
-                document.getElementById(`book-grid-${s.id}`).innerHTML = '';
-            });
-
-            if (books.length === 0) {
-                globalSeries.forEach(s => {
-                    document.getElementById(`book-grid-${s.id}`).innerHTML = '<div class="col-12 text-center text-muted py-3">此系列目前尚無書籍</div>';
-                });
-                return;
-            }
-
-            books.forEach(book => {
-                // 產生修改系列的下拉選單選項
-                let selectOptions = '';
-                globalSeries.forEach(s => {
-                    const isSelected = s.id === book.series_id ? 'selected' : '';
-                    selectOptions += `<option value="${s.id}" ${isSelected}>${s.name}</option>`;
-                });
-
-                const cardHtml = `
-                    <div class="col">
-                        <div class="card h-100 shadow-sm book-card border-0 bg-light">
-                            <div class="card-body d-flex flex-column justify-content-between">
-                                <div>
-                                    <h5 class="card-title text-dark font-monospace">${book.title}</h5>
-                                </div>
-                                <div class="mt-3">
-                                    <label class="form-label text-muted mb-1" style="font-size:0.75rem;">變更所屬系列：</label>
-                                    <select class="form-select form-select-sm mb-3" onchange="moveBook(${book.id}, this.value)">
-                                        ${selectOptions}
-                                    </select>
-                                    <button class="btn btn-dark btn-sm w-100 read-btn" onclick="openBook(${book.id})">開啟閱讀 📖</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>`;
-
-                const targetGrid = document.getElementById(`book-grid-${book.series_id}`);
-                if (targetGrid) {
-                    targetGrid.innerHTML += cardHtml;
-                }
-            });
-
-            // 如果有系列為空，補上提示字
-            globalSeries.forEach(s => {
-                const grid = document.getElementById(`book-grid-${s.id}`);
-                if(grid.innerHTML.trim() === '') {
-                    grid.innerHTML = '<div class="col-12 text-center text-muted py-3">此系列目前尚無書籍，請從其他系列下拉選單移入</div>';
-                }
-            });
-        }
-
-        // 3. 變更書籍所屬系列（點擊選單即時寫入雲端資料庫）
-        async function moveBook(bookId, seriesId) {
-            await fetch(`/books/${bookId}/move`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ series_id: parseInt(seriesId) })
-            });
-            await loadBooks(); // 重新整理書籍排位
-        }
-
-        // 4. 新增自訂系列標籤
-        document.getElementById('seriesForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const input = document.getElementById('seriesName');
-            const res = await fetch('/series', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: input.value })
-            });
-            const data = await res.json();
-            if(data.error) {
-                alert(data.error);
-            } else {
-                input.value = '';
-                initializePage(); // 重新刷頁面與標籤
-            }
-        });
-
-        // 5. 點擊書籍開啟第二層的章節分頁閱讀器
-        async function openBook(bookId) {
-            const res = await fetch(`/books/${bookId}`);
-            const data = await res.json();
-            
-            document.getElementById('bookTitle').innerText = data.title;
-            document.getElementById('bookSeriesName').innerText = `所屬套書系列：${data.series_name}`;
-
-            const tabList = document.getElementById('chapterTabs');
-            const tabContent = document.getElementById('chapterTabContent');
-            tabList.innerHTML = '';
-            tabContent.innerHTML = '';
-
-            data.chapters.forEach((ch, index) => {
-                const isActive = index === 0 ? 'active' : '';
-                
-                tabList.innerHTML += `
-                    <li class="nav-item">
-                        <button class="nav-link ${isActive} btn-sm" id="ch-tab-${index}" data-bs-toggle="tab" data-bs-target="#ch-content-${index}" type="button">${ch.title}</button>
-                    </li>`;
-                
-                tabContent.innerHTML += `
-                    <div class="tab-pane fade show ${isActive}" id="ch-content-${index}">
-                        <div style="white-space: pre-wrap;">${ch.content}</div>
-                    </div>`;
-            });
-
-            const reader = document.getElementById('readerArea');
-            reader.classList.remove('d-none');
-            reader.scrollIntoView({ behavior: 'smooth' });
-        }
-
-        // 6. 處理 EPUB 書籍上傳
-        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const fileInput = document.getElementById('epubFile');
-            const formData = new FormData();
-            formData.append('file', fileInput.files[0]);
-
-            document.getElementById('loading').classList.remove('d-none');
-            document.getElementById('uploadBtn').disabled = true;
-
-            try {
-                const response = await fetch('/upload', { method: 'POST', body: formData });
-                const data = await response.json();
-                
-                if (data.error) { alert(data.error); return; }
-
-                fileInput.value = '';
-                await loadBooks();
-                openBook(data.id);
-            } catch (err) {
-                alert('上傳失敗');
-            } finally {
-                document.getElementById('loading').classList.add('d-none');
-                document.getElementById('uploadBtn').disabled = false;
-            }
-        });
-    </script>
+<body>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1">&lt;!DOCTYPE html&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1">&lt;html lang="zh-TW"&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1">&lt;head&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">    </span>&lt;meta charset="UTF-8"&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">    </span>&lt;meta name="viewport" content="width=device-width, initial-scale=1.0"&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">    </span>&lt;title&gt;雲端 EPUB 智能書庫&lt;/title&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">    </span>&lt;style&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>:root {</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>--primary: #4a6fa5;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>--success: #2ec4b6;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>--danger: #e71d36;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>--dark: #011627;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>--light: #f6f8fa;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>}</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>body {</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>background-color: var(--light);</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>color: var(--dark);</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>margin: 0;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>padding: 20px;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>}</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>.container {</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>max-width: 900px;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>margin: 0 auto;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>}</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>header {</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>display: flex;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>justify-content: space-between;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>align-items: center;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>padding: 15px 25px;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>background: white;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>border-radius: 12px;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>box-shadow: 0 4px 6px rgba(0,0,0,0.05);</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>margin-bottom: 20px;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>}</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>.auth-panel input {</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>padding: 8px 12px;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>margin-right: 5px;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>border: 1px solid #ccc;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>border-radius: 6px;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>}</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>button {</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>padding: 8px 16px;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>border: none;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>border-radius: 6px;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>cursor: pointer;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>font-weight: bold;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>transition: opacity 0.2s;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>}</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>button:hover { opacity: 0.9; }</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>.btn-primary { background: var(--primary); color: white; }</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>.btn-success { background: var(--success); color: white; }</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>.btn-danger { background: var(--danger); color: white; }</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f; min-height: 34.0px"><span class="s1"><span class="Apple-converted-space">        </span></span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>.card {</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>background: white;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>padding: 25px;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>border-radius: 12px;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>box-shadow: 0 4px 6px rgba(0,0,0,0.05);</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>margin-bottom: 20px;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>}</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>.book-item {</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>display: flex;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>justify-content: space-between;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>align-items: center;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>padding: 15px;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>border-bottom: 1px solid #eee;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>}</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>.tag {</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>font-size: 0.85em;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>padding: 3px 8px;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>border-radius: 4px;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>margin-left: 8px;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>}</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>.tag-temp { background: #ffe3e3; color: var(--danger); }</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>.tag-admin { background: #e3faf2; color: var(--success); }</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>.admin-section {</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>border: 2px dashed var(--primary);</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>display: none; /* 預設隱藏，管理員登入才顯示 */</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>}</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">    </span>&lt;/style&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1">&lt;/head&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1">&lt;body&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f; min-height: 34.0px"><span class="s1"></span><br></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1">&lt;div class="container"&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">    </span>&lt;!-- 頂部狀態與會員列 --&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">    </span>&lt;header&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>&lt;h2&gt;📚 雲端智能書庫&lt;/h2&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div id="authArea" class="auth-panel"&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>&lt;!-- 偵測狀態後由 JS 動態渲染 --&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>載入中...</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">    </span>&lt;/header&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f; min-height: 34.0px"><span class="s1"></span><br></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">    </span>&lt;!-- 📥 上傳區塊 --&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="card"&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>&lt;h3&gt;📥 上傳新書籍 (EPUB)&lt;/h3&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>&lt;p style="color: #666; font-size: 0.9em;"&gt;提示：未登入狀態下上傳的書籍為臨時檔案，將於 24 小時後自動刪除。&lt;/p&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div style="display: flex; gap: 10px; margin-top: 15px;"&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>&lt;input type="file" id="epubFile" accept=".epub" style="flex: 1;"&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>&lt;button class="btn-primary" onclick="handleUpload()"&gt;開始上傳與解析&lt;/button&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div id="uploadStatus" style="margin-top: 10px; font-weight: bold;"&gt;&lt;/div&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">    </span>&lt;/div&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f; min-height: 34.0px"><span class="s1"></span><br></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">    </span>&lt;!-- 📖 個人與公開書庫清單 --&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="card"&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>&lt;h3&gt;📖 我的雲端書櫃&lt;/h3&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div id="bookList"&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>&lt;p style="color: #999;"&gt;書櫃空空如也，快去上傳一本吧！&lt;/p&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">    </span>&lt;/div&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f; min-height: 34.0px"><span class="s1"></span><br></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">    </span>&lt;!-- 🔧 管理員專屬設定面板 --&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div id="adminPanel" class="card admin-section"&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>&lt;h3&gt;🔧 系統管理員進階設定&lt;/h3&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>&lt;p&gt;您已以管理員 (Admin) 身份登入，可在下方新增或管理書籍系列標籤：&lt;/p&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div style="display: flex; gap: 10px; margin-top: 15px;"&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>&lt;input type="text" id="newSeriesName" placeholder="輸入新系列名稱 (如：哈利波特)"&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>&lt;button class="btn-success" onclick="createNewSeries()"&gt;建立新系列分類&lt;/button&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div id="seriesStatus" style="margin-top: 10px; color: var(--success);"&gt;&lt;/div&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">    </span>&lt;/div&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1">&lt;/div&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f; min-height: 34.0px"><span class="s1"></span><br></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1">&lt;script&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">    </span>// 網頁開啟時即刻檢查使用者登入狀態</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">    </span>document.addEventListener("DOMContentLoaded", checkUserStatus);</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f; min-height: 34.0px"><span class="s1"></span><br></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">    </span>function checkUserStatus() {</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>fetch('/user/status')</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>.then(res =&gt; res.json())</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>.then(data =&gt; {</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                </span>const authArea = document.getElementById('authArea');</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                </span>const adminPanel = document.getElementById('adminPanel');</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f; min-height: 34.0px"><span class="s1"><span class="Apple-converted-space">                </span></span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                </span>if (data.logged_in) {</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                    </span>authArea.innerHTML = `</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                        </span>&lt;span&gt;歡迎，&lt;b&gt;${data.username}&lt;/b&gt; ${data.is_admin ? '&lt;span class="tag tag-admin"&gt;管理員&lt;/span&gt;' : ''}&lt;/span&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                        </span>&lt;button class="btn-danger" onclick="handleLogout()" style="margin-left:10px;"&gt;登出&lt;/button&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                    </span>`;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                    </span>// 如果是管理員，把後台設定面板秀出來</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                    </span>if (data.is_admin) adminPanel.style.display = 'block';</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                </span>} else {</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                    </span>adminPanel.style.display = 'none';</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                    </span>authArea.innerHTML = `</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                        </span>&lt;input type="text" id="username" placeholder="帳號" style="width:100px;"&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                        </span>&lt;input type="password" id="password" placeholder="密碼" style="width:100px;"&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                        </span>&lt;button class="btn-primary" onclick="handleLogin()"&gt;登入&lt;/button&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                        </span>&lt;button class="btn-success" onclick="handleRegister()"&gt;註冊&lt;/button&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                    </span>`;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                </span>}</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                </span>// 每次狀態更新，刷新書籍清單</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                </span>loadBookList();</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>});</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">    </span>}</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f; min-height: 34.0px"><span class="s1"></span><br></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">    </span>// 🔐 會員系統操作邏輯</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">    </span>function handleLogin() {</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>const u = document.getElementById('username').value;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>const p = document.getElementById('password').value;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>fetch('/login', {</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>method: 'POST',</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>headers: { 'Content-Type': 'application/json' },</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>body: JSON.stringify({ username: u, password: p })</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>}).then(res =&gt; {</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>if (res.ok) { checkUserStatus(); }<span class="Apple-converted-space"> </span></span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>else { alert("登入失敗，請檢查帳號密碼！"); }</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>});</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">    </span>}</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f; min-height: 34.0px"><span class="s1"></span><br></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">    </span>function handleRegister() {</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>const u = document.getElementById('username').value;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>const p = document.getElementById('password').value;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>fetch('/register', {</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>method: 'POST',</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>headers: { 'Content-Type': 'application/json' },</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>body: JSON.stringify({ username: u, password: p })</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>}).then(res =&gt; res.json()).then(data =&gt; {</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>if (data.success) { alert("註冊成功！現在可以直接點擊登入。"); }<span class="Apple-converted-space"> </span></span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>else { alert(data.error); }</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>});</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">    </span>}</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f; min-height: 34.0px"><span class="s1"></span><br></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">    </span>function handleLogout() {</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>fetch('/logout', { method: 'POST' }).then(() =&gt; checkUserStatus());</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">    </span>}</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f; min-height: 34.0px"><span class="s1"></span><br></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">    </span>// 📥 上傳檔案邏輯</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">    </span>function handleUpload() {</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>const fileInput = document.getElementById('epubFile');</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>const statusDiv = document.getElementById('uploadStatus');</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>if (!fileInput.files[0]) { alert("請先選擇一個 EPUB 檔案！"); return; }</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f; min-height: 34.0px"><span class="s1"></span><br></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>const formData = new FormData();</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>formData.append('file', fileInput.files[0]);</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f; min-height: 34.0px"><span class="s1"></span><br></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>statusDiv.style.color = "orange";</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>statusDiv.innerText = "正在上傳並解析書籍（這可能需要幾秒鐘）...";</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f; min-height: 34.0px"><span class="s1"></span><br></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>fetch('/upload', { method: 'POST', body: formData })</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>.then(res =&gt; res.json())</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>.then(data =&gt; {</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                </span>if (data.error) {</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                    </span>statusDiv.style.color = "var(--danger)";</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                    </span>statusDiv.innerText = `失敗: ${data.error}`;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                </span>} else {</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                    </span>statusDiv.style.color = "var(--success)";</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                    </span>statusDiv.innerText = data.message;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                    </span>loadBookList(); // 重新整理書櫃</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                </span>}</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>}).catch(() =&gt; {</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                </span>statusDiv.style.color = "var(--danger)";</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                </span>statusDiv.innerText = "連線失敗，請檢查網路或伺服器紀錄。";</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>});</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">    </span>}</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f; min-height: 34.0px"><span class="s1"></span><br></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">    </span>// 📖 渲染書籍清單與下載功能</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">    </span>function loadBookList() {</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>const listDiv = document.getElementById('bookList');</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>fetch('/books')</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>.then(res =&gt; res.json())</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>.then(books =&gt; {</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                </span>if (books.length === 0) {</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                    </span>listDiv.innerHTML = '&lt;p style="color: #999;"&gt;書櫃空空如也，快去上傳一本吧！&lt;/p&gt;';</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                    </span>return;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                </span>}</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f; min-height: 34.0px"><span class="s1"><span class="Apple-converted-space">                </span></span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                </span>listDiv.innerHTML = books.map(book =&gt; `</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                    </span>&lt;div class="book-item"&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                        </span>&lt;div&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                            </span>&lt;strong style="font-size: 1.1em; color: var(--dark);"&gt;${book.title}&lt;/strong&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                            </span>&lt;span style="color: #777; margin-left: 10px;"&gt;分類櫃：${book.series_name}&lt;/span&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                            </span>${book.is_temporary ? '&lt;span class="tag tag-temp"&gt;⏳ 24h 臨時&lt;/span&gt;' : ''}</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                            </span>&lt;br&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                            </span>&lt;small style="color: #999;"&gt;上傳者: ${book.uploader || '匿名訪客'}&lt;/small&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                        </span>&lt;/div&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                        </span>&lt;div&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                            </span>&lt;!-- ⚡ 重點：直接呼叫後端 TXT 一鍵轉換導出接口 --&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                            </span>&lt;button class="btn-success" onclick="window.location.href='/books/${book.id}/download/txt'"&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                                </span>📥 下載 TXT 檔</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                            </span>&lt;/button&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                        </span>&lt;/div&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                    </span>&lt;/div&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                </span>`).join('');</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>});</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">    </span>}</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f; min-height: 34.0px"><span class="s1"></span><br></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">    </span>// 👑 管理員功能：建立系列標籤</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">    </span>function createNewSeries() {</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>const nameInput = document.getElementById('newSeriesName');</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>const statusDiv = document.getElementById('seriesStatus');</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>const name = nameInput.value.trim();</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>if(!name) return;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f; min-height: 34.0px"><span class="s1"></span><br></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>fetch('/series', {</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>method: 'POST',</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>headers: { 'Content-Type': 'application/json' },</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>body: JSON.stringify({ name: name })</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>}).then(res =&gt; res.json()).then(data =&gt; {</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>if(data.error) {</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                </span>alert(data.error);</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>} else {</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                </span>statusDiv.innerText = `成功建立分類標籤：「${data.name}」！`;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                </span>nameInput.value = "";</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">                </span>setTimeout(() =&gt; statusDiv.innerText = "", 3000);</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">            </span>}</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">        </span>});</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1"><span class="Apple-converted-space">    </span>}</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1">&lt;/script&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f; min-height: 34.0px"><span class="s1"></span><br></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1">&lt;/body&gt;</span></h1>
+<h1 style="margin: 0.0px 0.0px 18.0px 0.0px; text-align: center; font: 28.5px '.Apple Color Emoji UI'; color: #191c1f; -webkit-text-stroke: #191c1f"><span class="s1">&lt;/html&gt;</span></h1>
 </body>
 </html>
