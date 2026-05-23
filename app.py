@@ -1,5 +1,6 @@
 import os
 import uuid
+import json
 from flask import Flask, request, jsonify, render_template, session, send_file, Response
 from flask_session import Session
 import ebooklib
@@ -13,25 +14,63 @@ app.config["SECRET_KEY"] = os.urandom(24)
 app.config["SESSION_TYPE"] = "filesystem"
 Session(app)
 
-# 模擬資料庫 (預設管理員密碼已改為 admin123)
-USERS = {
-    "admin": {"password": "admin123", "is_admin": True},
-    "user1": {"password": "user1password", "is_admin": False}
-}
-BOOKS = []
+# 📂 資料持久化路徑設定
+USERS_FILE = "users.json"
+BOOKS_FILE = "books.json"
+
+# 初始化使用者資料 (確保至少有預設管理員)
+def load_users():
+    if os.path.exists(USERS_FILE):
+        try:
+            with open(USERS_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    # 預設初始資料
+    return {
+        "admin": {"password": "admin123", "is_admin": True},
+        "user1": {"password": "user1password", "is_admin": False}
+    }
+
+def save_users(users_data):
+    with open(USERS_FILE, "w", encoding="utf-8") as f:
+        json.dump(users_data, f, ensure_ascii=False, indent=4)
+
+# 初始化書籍資料
+def load_books():
+    if os.path.exists(BOOKS_FILE):
+        try:
+            with open(BOOKS_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return []
+
+def save_books(books_data):
+    with open(BOOKS_FILE, "w", encoding="utf-8") as f:
+        json.dump(books_data, f, ensure_ascii=False, indent=4)
+
+# 載入初始資料
+USERS = load_users()
+BOOKS = load_books()
 SERIES = ["預設分類"]
 
-# 首頁路由：指向 templates 資料夾下的 index.html，並強制指定 mimetype 避免文字解析錯誤
+# 確保每次有新分類時也能從書籍中提取
+for b in BOOKS:
+    if b["series_name"] not in SERIES:
+        SERIES.append(b["series_name"])
+
+
+# 首頁路由
 @app.route('/')
 def index():
     try:
-        # 指向正確的 templates/index.html 路徑
         template_path = os.path.join(app.root_path, 'templates', 'index.html')
         with open(template_path, "r", encoding="utf-8") as f:
             html_content = f.read()
         return Response(html_content, mimetype='text/html')
     except Exception as e:
-        return f"找不到 templates/index.html 檔案，請確認 templates 資料夾名稱為小寫，且檔案在裡面。錯誤：{str(e)}", 404
+        return f"找不到 templates/index.html 檔案，錯誤：{str(e)}", 404
 
 # 🔐 會員系統 API
 @app.route('/user/status', methods=['GET'])
@@ -46,6 +85,8 @@ def user_status():
 
 @app.route('/login', methods=['POST'])
 def login():
+    global USERS
+    USERS = load_users() # 登入時重新讀取，確保拿到最新註冊的資料
     data = request.get_json()
     username = data.get("username")
     password = data.get("password")
@@ -59,14 +100,21 @@ def login():
 
 @app.route('/register', methods=['POST'])
 def register():
+    global USERS
+    USERS = load_users() # 註冊前重新讀取最新狀態
     data = request.get_json()
-    username = data.get("username")
-    password = data.get("password")
+    username = data.get("username", "").strip()
+    password = data.get("password", "").strip()
     
+    if not username || !password:
+        return jsonify({"success": False, "error": "帳號密碼不能為空"}), 400
+
     if username in USERS:
         return jsonify({"success": False, "error": "帳號已被註冊"}), 400
         
     USERS[username] = {"password": password, "is_admin": False}
+    save_users(USERS) # 💾 寫入 JSON 檔案永久儲存
+    
     return jsonify({"success": True})
 
 @app.route('/logout', methods=['POST'])
@@ -77,11 +125,16 @@ def logout():
 # 📥 書籍管理 API
 @app.route('/books', methods=['GET'])
 def get_books():
+    global BOOKS
+    BOOKS = load_books() # 獲取時重新讀取
     return jsonify(BOOKS)
 
-# 📥 升級版 API：支援單一檔案、多檔案、以及整個資料夾批次上傳
+# 📥 批次上傳 API
 @app.route('/upload', methods=['POST'])
 def upload_file():
+    global BOOKS
+    BOOKS = load_books()
+    
     if 'file' not in request.files:
         return jsonify({"error": "沒有檔案欄位"}), 400
         
@@ -122,8 +175,9 @@ def upload_file():
             uploaded_books.append(new_book)
         else:
             if file.filename:
-                errors.append(f"檔案 {file.filename} 格式不符，已被系統跳過（僅支援 EPUB 格式）")
+                errors.append(f"檔案 {file.filename} 格式不符，已被系統跳過")
 
+    save_books(BOOKS) # 💾 上傳成功後寫入 JSON 檔案永久儲存
     return jsonify({
         "message": f"成功匯入並解析 {len(uploaded_books)} 本書籍！",
         "books": uploaded_books,
@@ -133,6 +187,7 @@ def upload_file():
 # 📥 一鍵導出 TXT API
 @app.route('/books/<book_id>/download/txt', methods=['GET'])
 def download_txt(book_id):
+    BOOKS = load_books()
     book = next((b for b in BOOKS if b["id"] == book_id), None)
     if not book:
         return "Book not found", 404
