@@ -21,15 +21,17 @@ USERS = {
 BOOKS = []
 SERIES = ["預設分類"]
 
-# 首頁路由：採用最穩定的防純文字解析相容寫法（直接讀取同層 index.html）
+# 首頁路由：指向 templates 資料夾下的 index.html，並強制指定 mimetype 避免文字解析錯誤
 @app.route('/')
 def index():
     try:
-        with open("index.html", "r", encoding="utf-8") as f:
+        # 指向正確的 templates/index.html 路徑
+        template_path = os.path.join(app.root_path, 'templates', 'index.html')
+        with open(template_path, "r", encoding="utf-8") as f:
             html_content = f.read()
         return Response(html_content, mimetype='text/html')
     except Exception as e:
-        return f"找不到 index.html 檔案，請確認它有跟 app.py 放在一起。錯誤：{str(e)}", 404
+        return f"找不到 templates/index.html 檔案，請確認 templates 資料夾名稱為小寫，且檔案在裡面。錯誤：{str(e)}", 404
 
 # 🔐 會員系統 API
 @app.route('/user/status', methods=['GET'])
@@ -83,7 +85,6 @@ def upload_file():
     if 'file' not in request.files:
         return jsonify({"error": "沒有檔案欄位"}), 400
         
-    # 接收前端 append 進來的所有檔案物件
     files = request.files.getlist('file')
     
     if not files or files[0].filename == '':
@@ -93,18 +94,15 @@ def upload_file():
     errors = []
     
     for file in files:
-        # 過濾出 EPUB 檔案（有些系統資料夾會夾帶隱藏檔，需要過濾）
         if file and file.filename.endswith('.epub'):
             book_id = str(uuid.uuid4())
             upload_dir = "uploads"
             os.makedirs(upload_dir, exist_ok=True)
             
-            # 去除前端上傳資料夾時可能帶有的相對路徑（例如：小書庫/小說.epub -> 小說.epub）
             base_filename = os.path.basename(file.filename)
             file_path = os.path.join(upload_dir, f"{book_id}.epub")
             file.save(file_path)
             
-            # 解析 EPUB 內部的正式書籍標題
             try:
                 epub_book = epub.read_epub(file_path)
                 title_meta = epub_book.get_metadata('DC', 'title')
@@ -116,7 +114,7 @@ def upload_file():
             new_book = {
                 "id": book_id,
                 "title": title,
-                "series_name": SERIES[0],  # 預設分類
+                "series_name": SERIES[0],
                 "is_temporary": not is_logged_in,
                 "uploader": session["username"] if is_logged_in else "匿名訪客"
             }
@@ -124,7 +122,6 @@ def upload_file():
             uploaded_books.append(new_book)
         else:
             if file.filename:
-                # 記錄格式不符的檔案名稱
                 errors.append(f"檔案 {file.filename} 格式不符，已被系統跳過（僅支援 EPUB 格式）")
 
     return jsonify({

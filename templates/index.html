@@ -3,366 +3,663 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>雲端 EPUB 智能書庫</title>
+    <title>智能雲端書庫</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         :root {
-            --primary: #4a6fa5;
-            --primary-hover: #3b5984;
-            --success: #2ec4b6;
-            --success-hover: #23a99d;
-            --danger: #e71d36;
-            --danger-hover: #bcf13c;
-            --dark: #011627;
-            --light: #f6f8fa;
-            --gray: #6c757d;
+            --primary-color: #4a90e2;
+            --primary-hover: #357abd;
+            --bg-color: #f5f7fa;
+            --card-bg: #ffffff;
+            --text-color: #333333;
+            --text-muted: #777777;
+            --border-color: #e1e4e8;
         }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background-color: var(--light);
-            color: var(--dark);
+
+        * {
+            box-sizing: border-box;
             margin: 0;
-            padding: 20px;
-            line-height: 1.5;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
-        
-        .container {
-            max-width: 900px;
-            margin: 0 auto;
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
         }
-        
+
+        /* 導覽列 */
         header {
+            background-color: var(--card-bg);
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 15px 25px;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-            margin-bottom: 20px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
         }
-        
-        header h2 {
-            margin: 0;
+
+        .logo {
             font-size: 1.5rem;
-        }
-        
-        .auth-panel {
+            font-weight: bold;
+            color: var(--primary-color);
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 0.5rem;
         }
-        
-        .auth-panel input {
-            padding: 8px 12px;
-            border: 1px solid #ccc;
-            border-radius: 6px;
-            font-size: 0.9rem;
-            width: 110px;
-            transition: border-color 0.2s;
+
+        .user-panel {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
         }
-        
-        .auth-panel input:focus {
-            outline: none;
-            border-color: var(--primary);
-        }
-        
-        button {
-            padding: 8px 16px;
+
+        .btn {
+            padding: 0.5rem 1rem;
             border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary { background-color: var(--primary-color); color: white; }
+        .btn-primary:hover { background-color: var(--primary-hover); }
+        .btn-outline { background-color: transparent; border: 1px solid var(--border-color); color: var(--text-color); }
+        .btn-outline:hover { background-color: #eee; }
+        .btn-danger { background-color: #e74c3c; color: white; }
+        .btn-danger:hover { background-color: #c0392b; }
+
+        /* 主佈局 */
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            gap: 2rem;
+        }
+
+        /* 左側側邊欄 */
+        .sidebar {
+            background-color: var(--card-bg);
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+            height: fit-content;
+        }
+
+        .sidebar-section {
+            margin-bottom: 2rem;
+        }
+
+        .sidebar-section h3 {
+            font-size: 1rem;
+            margin-bottom: 1rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .category-list {
+            list-style: none;
+        }
+
+        .category-item {
+            padding: 0.75rem 1rem;
             border-radius: 6px;
             cursor: pointer;
-            font-weight: bold;
-            font-size: 0.9rem;
-            transition: background-color 0.2s, opacity 0.2s;
-        }
-        
-        button:hover {
-            opacity: 0.95;
-        }
-        
-        .btn-primary { background: var(--primary); color: white; }
-        .btn-primary:hover { background: var(--primary-hover); }
-        
-        .btn-success { background: var(--success); color: white; }
-        .btn-success:hover { background: var(--success-hover); }
-        
-        .btn-danger { background: var(--danger); color: white; }
-        .btn-danger:hover { background: var(--danger-hover); }
-        
-        .card {
-            background: white;
-            padding: 25px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-            margin-bottom: 20px;
-        }
-        
-        .card h3 {
-            margin-top: 0;
-            margin-bottom: 10px;
-            font-size: 1.25rem;
-            border-left: 4px solid var(--primary);
-            padding-left: 10px;
-        }
-        
-        .book-item {
+            margin-bottom: 0.25rem;
+            transition: background 0.2s;
             display: flex;
             justify-content: space-between;
-            align-items: center;
-            padding: 15px;
-            border-bottom: 1px solid #eee;
-            transition: background-color 0.2s;
         }
-        
-        .book-item:last-child {
-            border-bottom: none;
+
+        .category-item:hover, .category-item.active {
+            background-color: #edf2f7;
+            color: var(--primary-color);
+            font-weight: 600;
         }
-        
-        .book-item:hover {
-            background-color: #fafbfc;
-        }
-        
-        .tag {
-            font-size: 0.8em;
-            padding: 3px 8px;
-            border-radius: 4px;
-            margin-left: 8px;
-            font-weight: bold;
-            display: inline-block;
-        }
-        
-        .tag-temp { background: #ffe3e3; color: var(--danger); }
-        .tag-admin { background: #e3faf2; color: var(--success); }
-        
-        .admin-section {
-            border: 2px dashed var(--primary);
-            display: none; /* 預設隱藏，管理員登入才透過 JS 秀出 */
-        }
-        
-        .file-upload-wrapper {
-            display: flex;
-            gap: 10px;
-            margin-top: 15px;
-            align-items: center;
-        }
-        
-        input[type="file"] {
-            padding: 8px;
-            border: 1px dashed #ccc;
-            border-radius: 6px;
+
+        /* 上傳區域控制面版 */
+        .upload-zone {
+            border: 2px dashed #cbd5e0;
+            border-radius: 8px;
+            padding: 2rem 1rem;
+            text-align: center;
             background: #fafafa;
             cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 1.5rem;
+        }
+
+        .upload-zone:hover, .upload-zone.dragover {
+            border-color: var(--primary-color);
+            background: #f0f7ff;
+        }
+
+        .upload-zone i {
+            font-size: 2.5rem;
+            color: #a0aec0;
+            margin-bottom: 1rem;
+        }
+
+        .upload-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .upload-actions .btn {
+            justify-content: center;
+            font-size: 0.85rem;
+        }
+
+        /* 隱藏的原生 file inputs */
+        input[type="file"] {
+            display: none;
+        }
+
+        /* 右側書籍展示區 */
+        .main-content {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .content-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .book-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .book-card {
+            background-color: var(--card-bg);
+            border-radius: 8px;
+            padding: 1.25rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            position: relative;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .book-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+
+        .book-icon {
+            font-size: 3.5rem;
+            color: #e2e8f0;
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+
+        .book-title {
+            font-weight: 600;
+            font-size: 1rem;
+            margin-bottom: 0.5rem;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            height: 3rem;
+        }
+
+        .book-meta {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+        }
+
+        .tag-temp {
+            background: #fff5f5;
+            color: #e53e3e;
+            padding: 0.1rem 0.4rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            border: 1px solid #fed7d7;
+        }
+
+        /* 彈窗樣式 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        }
+
+        .modal-header {
+            font-size: 1.25rem;
+            font-weight: bold;
+            margin-bottom: 1rem;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.25rem;
+            font-size: 0.9rem;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.5rem;
+            margin-top: 1.5rem;
+        }
+
+        /* 進度條/通知提示 */
+        .toast-container {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            z-index: 2000;
+        }
+
+        .toast {
+            background: #333;
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 6px;
+            margin-top: 0.5rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
         }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <!-- 頂部導覽與會員狀態列 -->
+    <!-- 導覽頂欄 -->
     <header>
-        <h2>📚 雲端 EPUB 智能書庫</h2>
-        <div id="authArea" class="auth-panel">
+        <div class="logo">
+            <i class="fa-solid fa-book-open-reader"></i> 智能雲端書庫
+        </div>
+        <div class="user-panel" id="userPanel">
+            <!-- 這裡會由 JS 動態渲染登入狀態 -->
             <span>載入中...</span>
         </div>
     </header>
 
-    <!-- 📥 上傳區塊 -->
-    <div class="card">
-        <h3>📥 上傳新書籍 (EPUB)</h3>
-        <p style="color: var(--gray); font-size: 0.9em; margin: 5px 0 0 0;">
-            💡 提示：未登入狀態下上傳的書籍為「臨時書櫃」，系統將於 24 小時後自動銷毀刪除。
-        </p>
-        <div class="file-upload-wrapper">
-            <input type="file" id="epubFile" accept=".epub" style="flex: 1;">
-            <button class="btn-primary" onclick="handleUpload()">開始上傳與解析</button>
-        </div>
-        <div id="uploadStatus" style="margin-top: 12px; font-weight: bold; font-size: 0.95rem;"></div>
-    </div>
-
-    <!-- 📖 個人與公開書庫清單 -->
-    <div class="card">
-        <h3>📖 我的雲端書櫃</h3>
-        <div id="bookList">
-            <p style="color: #999; text-align: center; padding: 20px 0;">書櫃空空如也，快去上傳一本吧！</p>
-        </div>
-    </div>
-
-    <!-- 🔧 管理員專屬設定面板 -->
-    <div id="adminPanel" class="card admin-section">
-        <h3>🔧 系統管理員進階設定</h3>
-        <p style="color: #444; font-size: 0.95em;">您已以管理員 (Admin) 身份登入。可在下方新增全局書籍分類櫃：</p>
-        <div style="display: flex; gap: 10px; margin-top: 15px;">
-            <input type="text" id="newSeriesName" placeholder="輸入新分類名稱 (如：輕小說、技術叢書)" style="flex: 1; padding: 8px 12px; border: 1px solid #ccc; border-radius: 6px;">
-            <button class="btn-success" onclick="createNewSeries()">建立新系列分類</button>
-        </div>
-        <div id="seriesStatus" style="margin-top: 10px; font-weight: bold; color: var(--success); font-size: 0.95rem;"></div>
-    </div>
-</div>
-
-<script>
-    // 網頁載入完成後立即檢查登入狀態
-    document.addEventListener("DOMContentLoaded", checkUserStatus);
-
-    function checkUserStatus() {
-        fetch('/user/status')
-            .then(res => res.json())
-            .then(data => {
-                const authArea = document.getElementById('authArea');
-                const adminPanel = document.getElementById('adminPanel');
+    <!-- 主區塊 -->
+    <div class="container">
+        <!-- 左側控制邊欄 -->
+        <div class="sidebar">
+            <!-- 區塊一：多元批量上傳 -->
+            <div class="sidebar-section">
+                <h3>書籍匯入</h3>
+                <!-- 可拖曳區域 -->
+                <div class="upload-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                    <p>將 EPUB 拖曳至此<br>或點擊上傳</p>
+                </div>
                 
-                if (data.logged_in) {
-                    authArea.innerHTML = `
-                        <span>歡迎，<b>${data.username}</b> ${data.is_admin ? '<span class="tag tag-admin">管理員</span>' : ''}</span>
-                        <button class="btn-danger" onclick="handleLogout()" style="margin-left:10px;">登出</button>
-                    `;
-                    // 如果是管理員，開啟後台面板
-                    if (data.is_admin) {
-                        adminPanel.style.display = 'block';
-                    } else {
-                        adminPanel.style.display = 'none';
-                    }
-                } else {
-                    adminPanel.style.display = 'none';
-                    authArea.innerHTML = `
-                        <input type="text" id="username" placeholder="帳號">
-                        <input type="password" id="password" placeholder="密碼">
-                        <button class="btn-primary" onclick="handleLogin()">登入</button>
-                        <button class="btn-success" onclick="handleRegister()">註冊</button>
-                    `;
-                }
-                // 狀態更新後，同步載入書籍清單
-                loadBookList();
-            }).catch(err => {
-                console.error("無法連接到後端伺服器", err);
-            });
-    }
+                <!-- 精細控制按鈕群 -->
+                <div class="upload-actions">
+                    <!-- 允許多選檔案 -->
+                    <input type="file" id="fileInput" accept=".epub" multiple onchange="handleFileSelect(this.files)">
+                    <button class="btn btn-outline" onclick="document.getElementById('fileInput').click()">
+                        <i class="fa-solid fa-files"></i> 選擇多個檔案
+                    </button>
+                    
+                    <!-- 允許選擇整個資料夾 -->
+                    <input type="file" id="folderInput" accept=".epub" webkitdirectory directory multiple onchange="handleFileSelect(this.files)">
+                    <button class="btn btn-outline" onclick="document.getElementById('folderInput').click()">
+                        <i class="fa-solid fa-folder-open"></i> 選擇整個資料夾
+                    </button>
+                </div>
+            </div>
 
-    // 🔐 會員系統機制
-    function handleLogin() {
-        const u = document.getElementById('username').value.trim();
-        const p = document.getElementById('password').value.trim();
-        if (!u || !p) { alert("請輸入帳號與密碼！"); return; }
+            <!-- 區塊二：書籍分類 -->
+            <div class="sidebar-section">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h3 style="margin: 0;">分流群組</h3>
+                    <button class="btn btn-outline" style="padding: 0.2rem 0.5rem; font-size: 0.8rem;" id="addSeriesBtn" style="display:none;" onclick="showAddSeriesModal()">+</button>
+                </div>
+                <ul class="category-list" id="seriesList">
+                    <li class="category-item active">全部書籍</li>
+                </ul>
+            </div>
+        </div>
 
-        fetch('/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: u, password: p })
-        }).then(res => {
-            if (res.ok) { 
-                checkUserStatus(); 
-            } else { 
-                alert("登入失敗，請檢查您的帳號密碼是否正確！"); 
-            }
+        <!-- 右側書籍主面板 -->
+        <div class="main-content">
+            <div class="content-header">
+                <h2 id="currentCategoryTitle">所有書籍</h2>
+                <span id="bookCount" style="color: var(--text-muted); font-size: 0.9rem;">共 0 本</span>
+            </div>
+            
+            <!-- 書籍列表網格 -->
+            <div class="book-grid" id="bookGrid">
+                <!-- 由 JavaScript 自動填充 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 彈窗組件：會員登入 -->
+    <div class="modal" id="loginModal">
+        <div class="modal-content">
+            <div class="modal-header">會員登入</div>
+            <div class="form-group">
+                <label>帳號</label>
+                <input type="text" id="loginUser">
+            </div>
+            <div class="form-group">
+                <label>密碼</label>
+                <input type="password" id="loginPass">
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeModal('loginModal')">取消</button>
+                <button class="btn btn-primary" onclick="submitLogin()">登入</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 彈窗組件：新增分類（管理員專屬） -->
+    <div class="modal" id="seriesModal">
+        <div class="modal-content">
+            <div class="modal-header">新增分流群組</div>
+            <div class="form-group">
+                <label>群組分類名稱</label>
+                <input type="text" id="newSeriesName" placeholder="例如：科幻小說、學習資料">
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeModal('seriesModal')">取消</button>
+                <button class="btn btn-primary" onclick="submitCreateSeries()">建立</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 通知容器 -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- ⚡ 前端核心驅動腳本 -->
+    <script>
+        let currentBooks = [];
+        let userInfo = { logged_in: false, username: '', is_admin: false };
+
+        // 頁面初始化
+        window.addEventListener('DOMContentLoaded', () => {
+            checkUserStatus();
+            loadBooks();
+            setupDragAndDrop();
         });
-    }
 
-    function handleRegister() {
-        const u = document.getElementById('username').value.trim();
-        const p = document.getElementById('password').value.trim();
-        if (!u || !p) { alert("請輸入想要註冊的帳號與密碼！"); return; }
-
-        fetch('/register', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: u, password: p })
-        }).then(res => res.json()).then(data => {
-            if (data.success) { 
-                alert("註冊成功！現在可以直接點擊「登入」按鈕。"); 
-            } else { 
-                alert(data.error || "註冊失敗，該帳號可能已被使用。"); 
+        // 檢查登入狀態
+        async function checkUserStatus() {
+            try {
+                const res = await fetch('/user/status');
+                userInfo = await res.json();
+                renderUserPanel();
+            } catch (err) {
+                console.error("無法獲取用戶狀態", err);
             }
-        });
-    }
+        }
 
-    function handleLogout() {
-        fetch('/logout', { method: 'POST' }).then(() => checkUserStatus());
-    }
-
-    // 📥 上傳檔案機制
-    function handleUpload() {
-        const fileInput = document.getElementById('epubFile');
-        const statusDiv = document.getElementById('uploadStatus');
-        if (!fileInput.files[0]) { alert("請先選擇一個本地的 EPUB 檔案！"); return; }
-
-        const formData = new FormData();
-        formData.append('file', fileInput.files[0]);
-
-        statusDiv.style.color = "orange";
-        statusDiv.innerText = "⚡ 正在上傳並解析書籍（大型書籍需要較多時間，請勿重新整理網頁）...";
-
-        fetch('/upload', { method: 'POST', body: formData })
-            .then(res => res.json())
-            .then(data => {
-                if (data.error) {
-                    statusDiv.style.color = "var(--danger)";
-                    statusDiv.innerText = `❌ 失敗原因: ${data.error}`;
-                } else {
-                    statusDiv.style.color = "var(--success)";
-                    statusDiv.innerText = `🎉 ${data.message}`;
-                    fileInput.value = ""; // 清空上傳欄位
-                    loadBookList(); // 重新整理書櫃
-                }
-            }).catch(() => {
-                statusDiv.style.color = "var(--danger)";
-                statusDiv.innerText = "❌ 連線失敗，請檢查後端日誌。";
-            });
-    }
-
-    // 📖 渲染書籍清單與下載功能
-    function loadBookList() {
-        const listDiv = document.getElementById('bookList');
-        fetch('/books')
-            .then(res => res.json())
-            .then(books => {
-                if (!books || books.length === 0) {
-                    listDiv.innerHTML = '<p style="color: #999; text-align: center; padding: 20px 0;">書櫃空空如也，快去上傳一本吧！</p>';
-                    return;
-                }
-                
-                listDiv.innerHTML = books.map(book => `
-                    <div class="book-item">
-                        <div>
-                            <strong style="font-size: 1.1em; color: var(--dark);">${book.title}</strong>
-                            <span style="color: #666; margin-left: 10px; font-size: 0.9em;">分類：${book.series_name}</span>
-                            ${book.is_temporary ? '<span class="tag tag-temp">⏳ 24h 臨時</span>' : ''}
-                            <br>
-                            <small style="color: #999; font-size: 0.8em;">上傳者: ${book.uploader || '匿名訪客'}</small>
-                        </div>
-                        <div>
-                            <!-- 📥 直接調用後端精準格式轉換導出接口 -->
-                            <button class="btn-success" onclick="window.location.href='/books/${book.id}/download/txt'">
-                                📥 一鍵導出 TXT
-                            </button>
-                        </div>
-                    </div>
-                `).join('');
-            });
-    }
-
-    // 👑 管理員功能：建立系列分類櫃
-    function createNewSeries() {
-        const nameInput = document.getElementById('newSeriesName');
-        const statusDiv = document.getElementById('seriesStatus');
-        const name = nameInput.value.trim();
-        if (!name) { alert("請輸入系列分類名稱！"); return; }
-
-        fetch('/series', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: name })
-        }).then(res => res.json()).then(data => {
-            if (data.error) {
-                alert(data.error);
+        // 渲染頂部用戶面板
+        function renderUserPanel() {
+            const panel = document.getElementById('userPanel');
+            const addSeriesBtn = document.getElementById('addSeriesBtn');
+            
+            if (userInfo.logged_in) {
+                panel.innerHTML = `
+                    <span><i class="fa-solid fa-user"></i> ${userInfo.username} ${userInfo.is_admin ? '<span style="color:gold; font-size:0.8rem;">[管理員]</span>' : ''}</span>
+                    <button class="btn btn-danger" onclick="submitLogout()">登出</button>
+                `;
+                if (userInfo.is_admin) addSeriesBtn.style.display = 'block';
             } else {
-                statusDiv.innerText = `✅ 成功建立全局分類櫃：「${data.name}」！`;
-                nameInput.value = "";
-                setTimeout(() => { statusDiv.innerText = ""; }, 3000);
-                loadBookList(); // 重新整理清單
+                panel.innerHTML = `
+                    <button class="btn btn-outline" onclick="showModal('loginModal')">會員登入</button>
+                `;
+                addSeriesBtn.style.display = 'none';
             }
-        });
-    }
-</script>
+        }
 
+        // 載入所有書籍
+        async function loadBooks() {
+            try {
+                const res = await fetch('/books');
+                currentBooks = await res.json();
+                renderBookGrid(currentBooks);
+                updateSeriesList();
+            } catch (err) {
+                showToast("🔴 無法載入書籍清單");
+            }
+        }
+
+        // 渲染書籍網格面版
+        function renderBookGrid(books) {
+            const grid = document.getElementById('bookGrid');
+            document.getElementById('bookCount').innerText = `共 ${books.length} 本`;
+            
+            if (books.length === 0) {
+                grid.innerHTML = `
+                    <div style="grid-column: 1/-1; text-align: center; color: #a0aec0; padding: 3rem 0;">
+                        <i class="fa-solid fa-box-open" style="font-size: 3rem; margin-bottom: 1rem;"></i>
+                        <p>書庫空空如也，立刻在左側批次匯入 EPUB 書籍吧！</p>
+                    </div>
+                `;
+                return;
+            }
+
+            grid.innerHTML = books.map(book => `
+                <div class="book-card">
+                    <div class="book-icon"><i class="fa-solid fa-file-lines" style="color: #4a90e2;"></i></div>
+                    <div class="book-title" title="${book.title}">${book.title}</div>
+                    <div class="book-meta">
+                        <div>分類: ${book.series_name}</div>
+                        <div style="margin-top: 0.25rem;">上傳者: ${book.uploader} ${book.is_temporary ? '<span class="tag-temp">暫存</span>' : ''}</div>
+                    </div>
+                    <a href="/books/${book.id}/download/txt" class="btn btn-primary" style="font-size: 0.85rem; justify-content: center; width: 100%;">
+                        <i class="fa-solid fa-file-arrow-down"></i> 一鍵導出 TXT
+                    </a>
+                </div>
+            `).join('');
+        }
+
+        // 匯集並動態更新分類清單
+        function updateSeriesList() {
+            const list = document.getElementById('seriesList');
+            // 從書籍中抓取所有獨特的分類名稱
+            const categories = ['全部書籍', ...new Set(currentBooks.map(b => b.series_name))];
+            
+            list.innerHTML = categories.map((cat, idx) => `
+                <li class="category-item ${idx === 0 ? 'active' : ''}" onclick="filterCategory(this, '${cat}')">
+                    <span><i class="fa-solid fa-folder" style="margin-right:0.5rem; color:#f39c12;"></i>${cat}</span>
+                </li>
+            `).join('');
+        }
+
+        // 按分類過濾書籍
+        function filterCategory(element, category) {
+            document.querySelectorAll('.category-item').forEach(el => el.classList.remove('active'));
+            element.classList.add('active');
+            document.getElementById('currentCategoryTitle').innerText = category;
+            
+            if (category === '全部書籍') {
+                renderBookGrid(currentBooks);
+            } else {
+                const filtered = currentBooks.filter(b => b.series_name === category);
+                renderBookGrid(filtered);
+            }
+        }
+
+        // 核心功能：處理多檔案/資料夾批量上傳
+        async function handleFileSelect(fileList) {
+            if (fileList.length === 0) return;
+
+            const formData = new FormData();
+            let validCount = 0;
+
+            // 把選取到的所有檔案依序打包進 FormData 中
+            for (let i = 0; i < fileList.length; i++) {
+                // 過濾，只允許 .epub 檔案
+                if (fileList[i].name.endsWith('.epub') || fileList[i].type === "application/epub+zip") {
+                    formData.append('file', fileList[i]);
+                    validCount++;
+                }
+            }
+
+            if (validCount === 0) {
+                alert("所選檔案中沒有合法的 EPUB 電子書！");
+                return;
+            }
+
+            showToast(`⏳ 正在上傳並解析 ${validCount} 個檔案，請稍候...`);
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                if (response.ok) {
+                    showToast(`🎉 ${result.message}`);
+                    if (result.errors && result.errors.length > 0) {
+                        console.warn("部分檔案有問題:", result.errors);
+                    }
+                    loadBooks(); // 重新整理列表
+                } else {
+                    alert("上傳失敗: " + result.error);
+                }
+            } catch (err) {
+                console.error(err);
+                showToast("🔴 批次上傳過程中發生連線異常");
+            }
+        }
+
+        // 拖曳上傳控制邏輯
+        function setupDragAndDrop() {
+            const dropZone = document.getElementById('dropZone');
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropZone.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    dropZone.classList.add('dragover');
+                }, false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    dropZone.classList.remove('dragover');
+                }, false);
+            });
+
+            dropZone.addEventListener('drop', (e) => {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                handleFileSelect(files);
+            }, false);
+        }
+
+        // 🔐 會員控制網絡請求
+        async function submitLogin() {
+            const username = document.getElementById('loginUser').value;
+            const password = document.getElementById('loginPass').value;
+            
+            const res = await fetch('/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+
+            if (res.ok) {
+                closeModal('loginModal');
+                showToast("🟢 登入成功！歡迎回來");
+                checkUserStatus();
+                loadBooks();
+            } else {
+                alert("登入失敗，預設管理者密碼為 admin123 唷！");
+            }
+        }
+
+        async function submitLogout() {
+            await fetch('/logout', { method: 'POST' });
+            showToast("🔒 已安全登出");
+            checkUserStatus();
+            loadBooks();
+        }
+
+        async function submitCreateSeries() {
+            const name = document.getElementById('newSeriesName').value;
+            const res = await fetch('/series', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name })
+            });
+
+            const result = await res.json();
+            if (res.ok) {
+                closeModal('seriesModal');
+                showToast(`📁 成功建立新分流群組：${name}`);
+                loadBooks();
+            } else {
+                alert("建立失敗: " + result.error);
+            }
+        }
+
+        // 視窗 UI 控制
+        function showModal(id) { document.getElementById(id).style.display = 'flex'; }
+        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+        function showAddSeriesModal() { showModal('seriesModal'); }
+
+        // 右下角黑底提示框
+        function showToast(text) {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.innerHTML = `<i class="fa-solid fa-circle-info"></i> <span>${text}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 4000);
+        }
+    </script>
 </body>
 </html>
