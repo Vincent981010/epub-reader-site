@@ -1,6 +1,6 @@
 import os
 import uuid
-from flask import Flask, request, jsonify, render_template, session, send_file
+from flask import Flask, request, jsonify, render_template, session, send_file, Response
 from flask_session import Session
 import ebooklib
 from ebooklib import epub
@@ -13,18 +13,23 @@ app.config["SECRET_KEY"] = os.urandom(24)
 app.config["SESSION_TYPE"] = "filesystem"
 Session(app)
 
-# 模擬資料庫 (實際開發建議改用 SQLite 或 PostgreSQL)
+# 模擬資料庫 (預設管理員密碼已改為 admin123)
 USERS = {
-    "admin": {"password": "adminpassword", "is_admin": True},
+    "admin": {"password": "admin123", "is_admin": True},
     "user1": {"password": "user1password", "is_admin": False}
 }
 BOOKS = []
 SERIES = ["預設分類"]
 
-# 首頁路由：改用標準的 render_template，徹底解決瀏覽器文字排版錯誤問題
+# 首頁路由：採用最穩定的防純文字解析相容寫法（直接讀取同層 index.html）
 @app.route('/')
 def index():
-    return render_template("index.html")
+    try:
+        with open("index.html", "r", encoding="utf-8") as f:
+            html_content = f.read()
+        return Response(html_content, mimetype='text/html')
+    except Exception as e:
+        return f"找不到 index.html 檔案，請確認它有跟 app.py 放在一起。錯誤：{str(e)}", 404
 
 # 🔐 會員系統 API
 @app.route('/user/status', methods=['GET'])
@@ -72,41 +77,61 @@ def logout():
 def get_books():
     return jsonify(BOOKS)
 
+# 📥 升級版 API：支援單一檔案、多檔案、以及整個資料夾批次上傳
 @app.route('/upload', methods=['POST'])
 def upload_file():
     if 'file' not in request.files:
-        return jsonify({"error": "沒有檔案"}), 400
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({"error": "未選擇檔案"}), 400
+        return jsonify({"error": "沒有檔案欄位"}), 400
         
-    if file and file.filename.endswith('.epub'):
-        book_id = str(uuid.uuid4())
-        # 安全存檔
-        upload_dir = "uploads"
-        os.makedirs(upload_dir, exist_ok=True)
-        file_path = os.path.join(upload_dir, f"{book_id}.epub")
-        file.save(file_path)
+    # 接收前端 append 進來的所有檔案物件
+    files = request.files.getlist('file')
+    
+    if not files or files[0].filename == '':
+        return jsonify({"error": "未選擇任何檔案"}), 400
         
-        # 解析 EPUB 標題
-        try:
-            epub_book = epub.read_epub(file_path)
-            title = epub_book.get_metadata('DC', 'title')[0][0] if epub_book.get_metadata('DC', 'title') else "未知名稱書籍"
-        except Exception:
-            title = file.filename.rsplit('.', 1)[0]
+    uploaded_books = []
+    errors = []
+    
+    for file in files:
+        # 過濾出 EPUB 檔案（有些系統資料夾會夾帶隱藏檔，需要過濾）
+        if file and file.filename.endswith('.epub'):
+            book_id = str(uuid.uuid4())
+            upload_dir = "uploads"
+            os.makedirs(upload_dir, exist_ok=True)
+            
+            # 去除前端上傳資料夾時可能帶有的相對路徑（例如：小書庫/小說.epub -> 小說.epub）
+            base_filename = os.path.basename(file.filename)
+            file_path = os.path.join(upload_dir, f"{book_id}.epub")
+            file.save(file_path)
+            
+            # 解析 EPUB 內部的正式書籍標題
+            try:
+                epub_book = epub.read_epub(file_path)
+                title_meta = epub_book.get_metadata('DC', 'title')
+                title = title_meta[0][0] if title_meta else base_filename.rsplit('.', 1)[0]
+            except Exception:
+                title = base_filename.rsplit('.', 1)[0]
 
-        is_logged_in = "username" in session
-        new_book = {
-            "id": book_id,
-            "title": title,
-            "series_name": SERIES[0], # 預設歸類到第一個分類
-            "is_temporary": not is_logged_in,
-            "uploader": session["username"] if is_logged_in else "匿名訪客"
-        }
-        BOOKS.append(new_book)
-        return jsonify({"message": f"書籍《{title}》上傳並解析成功！", "book": new_book})
-        
-    return jsonify({"error": "不支援的檔案格式，請上傳 EPUB"}), 400
+            is_logged_in = "username" in session
+            new_book = {
+                "id": book_id,
+                "title": title,
+                "series_name": SERIES[0],  # 預設分類
+                "is_temporary": not is_logged_in,
+                "uploader": session["username"] if is_logged_in else "匿名訪客"
+            }
+            BOOKS.append(new_book)
+            uploaded_books.append(new_book)
+        else:
+            if file.filename:
+                # 記錄格式不符的檔案名稱
+                errors.append(f"檔案 {file.filename} 格式不符，已被系統跳過（僅支援 EPUB 格式）")
+
+    return jsonify({
+        "message": f"成功匯入並解析 {len(uploaded_books)} 本書籍！",
+        "books": uploaded_books,
+        "errors": errors
+    })
 
 # 📥 一鍵導出 TXT API
 @app.route('/books/<book_id>/download/txt', methods=['GET'])
@@ -119,14 +144,12 @@ def download_txt(book_id):
     txt_path = os.path.join("uploads", f"{book_id}.txt")
     
     try:
-        # 讀取 EPUB 並將 HTML 內文清洗成純文字
         epub_book = epub.read_epub(file_path)
         full_text = []
         
         for item in epub_book.get_items():
             if item.get_type() == ebooklib.ITEM_DOCUMENT:
                 soup = BeautifulSoup(item.get_content(), 'html.parser')
-                # 簡單過濾掉腳本與樣式
                 for script in soup(["script", "style"]):
                     script.decompose()
                 full_text.append(soup.get_text())
