@@ -3,94 +3,259 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EPUB 自動分類閱讀器</title>
+    <title>動態自訂系列雲端書櫃</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .book-card { transition: all 0.2s; }
+        .book-card:hover { transform: translateY(-5px); box-shadow: 0 4px 15px rgba(0,0,0,0.1)!important; }
+        .read-btn { cursor: pointer; }
+        .chapter-box { max-height: 550px; overflow-y: auto; font-size: 1.1rem; line-height: 1.9; color: #2b2b2b; }
+    </style>
 </head>
 <body class="bg-light">
-    <div class="container py-5">
-        <h1 class="mb-4 text-center">📚 EPUB 自動分類閱讀器</h1>
+    <div class="container py-4">
+        <h1 class="mb-4 text-center">📚 自訂系列動態書櫃</h1>
         
-        <!-- 上傳區 -->
-        <div class="card p-4 mb-4 shadow-sm">
-            <form id="uploadForm">
-                <div class="mb-3">
-                    <label class="form-label">請選擇 EPUB 檔案</label>
-                    <input type="file" class="form-control" id="epubFile" accept=".epub" required>
+        <!-- 操作面板：上傳書籍 & 新增自訂系列 -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-7">
+                <div class="card p-3 shadow-sm bg-white h-100">
+                    <h5 class="card-title">📥 上傳新書籍</h5>
+                    <form id="uploadForm" class="d-flex gap-2 mt-2">
+                        <input type="file" class="form-control" id="epubFile" accept=".epub" required>
+                        <button type="submit" class="btn btn-primary text-nowrap" id="uploadBtn">上傳儲存</button>
+                    </form>
+                    <div id="loading" class="text-muted mt-2 d-none" style="font-size: 0.9rem;">
+                        <div class="spinner-border spinner-border-sm text-primary" role="status"></div> 正在解析書籍內容...
+                    </div>
                 </div>
-                <button type="submit" class="btn btn-primary w-100" id="uploadBtn">上傳並解析</button>
-            </form>
-            <div id="loading" class="text-center mt-3 d-none">
-                <div class="spinner-border text-primary" role="status"></div>
-                <p class="mt-2">正在努力解析與分類書籍，請稍候...</p>
+            </div>
+            <div class="col-md-5">
+                <div class="card p-3 shadow-sm bg-white h-100">
+                    <h5 class="card-title">✨ 建立新套書/系列標籤</h5>
+                    <form id="seriesForm" class="d-flex gap-2 mt-2">
+                        <input type="text" class="form-control" id="seriesName" placeholder="例如：哈利波特、魔戒" required>
+                        <button type="submit" class="btn bg-dark text-white text-nowrap">新增系列</button>
+                    </form>
+                </div>
             </div>
         </div>
 
-        <!-- 顯示區 -->
-        <div id="resultArea" class="d-none">
-            <div class="card p-4 shadow-sm">
-                <h2 id="bookTitle" class="card-title"></h2>
-                <div class="mb-3">
-                    <span class="fs-5 badge bg-success" id="bookCategory"></span>
+        <!-- 第一層：動態系列標籤頁（由資料庫撈出渲染） -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card p-3 shadow-sm bg-white">
+                    <ul class="nav nav-tabs mb-3" id="seriesTabs" role="tablist">
+                        <!-- 系列標籤按鈕會由 JS 動態生成 -->
+                    </ul>
+                    <div class="tab-content" id="seriesTabContent">
+                        <!-- 各系列的書籍卡片展示區會由 JS 動態生成 -->
+                    </div>
                 </div>
-                <hr>
-                <!-- 標籤頁控制鈕 -->
-                <ul class="nav nav-tabs" id="chapterTabs" role="tablist"></ul>
-                <!-- 標籤頁內文 -->
-                <div class="tab-content p-3 border border-top-0 bg-white" id="chapterTabContent" style="max-height: 600px; overflow-y: auto;"></div>
+            </div>
+        </div>
+
+        <!-- 第二層：書籍章節閱讀器區塊 -->
+        <div id="readerArea" class="row mt-4 d-none">
+            <div class="col-12">
+                <div class="card p-4 shadow-sm bg-white border-primary">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <h2 id="bookTitle" class="m-0"></h2>
+                            <span class="badge bg-info mt-1" id="bookSeriesName"></span>
+                        </div>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('readerArea').classList.add('d-none')">關閉內文 ✕</button>
+                    </div>
+                    <hr>
+                    <!-- 章節動態標籤頁 -->
+                    <ul class="nav nav-pills mb-3" id="chapterTabs" role="tablist"></ul>
+                    <div class="tab-content p-3 border rounded bg-light chapter-box" id="chapterTabContent"></div>
+                </div>
             </div>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        let globalSeries = []; // 儲存所有系列清單
+        
+        document.addEventListener('DOMContentLoaded', initializePage);
+
+        async function initializePage() {
+            await loadSeriesList(); // 先加載系列
+            await loadBooks();      // 再加載書籍並分類擺放
+        }
+
+        // 1. 從資料庫抓取自訂系列清單
+        async function loadSeriesList() {
+            const res = await fetch('/series');
+            globalSeries = await res.json();
+            
+            const tabsContainer = document.getElementById('seriesTabs');
+            const contentContainer = document.getElementById('seriesTabContent');
+            tabsContainer.innerHTML = '';
+            contentContainer.innerHTML = '';
+
+            // 動態產生大標籤頁
+            globalSeries.forEach((series, index) => {
+                const isActive = index === 0 ? 'active' : '';
+                const isShowActive = index === 0 ? 'show active' : '';
+                
+                // 渲染系列標籤頁按鈕
+                tabsContainer.innerHTML += `
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link ${isActive} fw-bold" id="series-tab-${series.id}" data-bs-toggle="tab" data-bs-target="#series-pane-${series.id}" type="button" role="tab">${series.name}</button>
+                    </li>`;
+                
+                // 渲染該系列對應的圖書容器
+                contentContainer.innerHTML += `
+                    <div class="tab-pane fade ${isShowActive}" id="series-pane-${series.id}" role="tabpanel">
+                        <div class="row row-cols-1 row-cols-md-3 g-3 mt-1" id="book-grid-${series.id}">
+                            <!-- 書籍會被分配到這裡 -->
+                        </div>
+                    </div>`;
+            });
+        }
+
+        // 2. 抓取所有書籍並塞進對應的系列標籤頁內
+        async function loadBooks() {
+            const res = await fetch('/books');
+            const books = await res.json();
+
+            // 先清空所有系列的網格
+            globalSeries.forEach(s => {
+                document.getElementById(`book-grid-${s.id}`).innerHTML = '';
+            });
+
+            if (books.length === 0) {
+                globalSeries.forEach(s => {
+                    document.getElementById(`book-grid-${s.id}`).innerHTML = '<div class="col-12 text-center text-muted py-3">此系列目前尚無書籍</div>';
+                });
+                return;
+            }
+
+            books.forEach(book => {
+                // 產生修改系列的下拉選單選項
+                let selectOptions = '';
+                globalSeries.forEach(s => {
+                    const isSelected = s.id === book.series_id ? 'selected' : '';
+                    selectOptions += `<option value="${s.id}" ${isSelected}>${s.name}</option>`;
+                });
+
+                const cardHtml = `
+                    <div class="col">
+                        <div class="card h-100 shadow-sm book-card border-0 bg-light">
+                            <div class="card-body d-flex flex-column justify-content-between">
+                                <div>
+                                    <h5 class="card-title text-dark font-monospace">${book.title}</h5>
+                                </div>
+                                <div class="mt-3">
+                                    <label class="form-label text-muted mb-1" style="font-size:0.75rem;">變更所屬系列：</label>
+                                    <select class="form-select form-select-sm mb-3" onchange="moveBook(${book.id}, this.value)">
+                                        ${selectOptions}
+                                    </select>
+                                    <button class="btn btn-dark btn-sm w-100 read-btn" onclick="openBook(${book.id})">開啟閱讀 📖</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>`;
+
+                const targetGrid = document.getElementById(`book-grid-${book.series_id}`);
+                if (targetGrid) {
+                    targetGrid.innerHTML += cardHtml;
+                }
+            });
+
+            // 如果有系列為空，補上提示字
+            globalSeries.forEach(s => {
+                const grid = document.getElementById(`book-grid-${s.id}`);
+                if(grid.innerHTML.trim() === '') {
+                    grid.innerHTML = '<div class="col-12 text-center text-muted py-3">此系列目前尚無書籍，請從其他系列下拉選單移入</div>';
+                }
+            });
+        }
+
+        // 3. 變更書籍所屬系列（點擊選單即時寫入雲端資料庫）
+        async function moveBook(bookId, seriesId) {
+            await fetch(`/books/${bookId}/move`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ series_id: parseInt(seriesId) })
+            });
+            await loadBooks(); // 重新整理書籍排位
+        }
+
+        // 4. 新增自訂系列標籤
+        document.getElementById('seriesForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const input = document.getElementById('seriesName');
+            const res = await fetch('/series', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: input.value })
+            });
+            const data = await res.json();
+            if(data.error) {
+                alert(data.error);
+            } else {
+                input.value = '';
+                initializePage(); // 重新刷頁面與標籤
+            }
+        });
+
+        // 5. 點擊書籍開啟第二層的章節分頁閱讀器
+        async function openBook(bookId) {
+            const res = await fetch(`/books/${bookId}`);
+            const data = await res.json();
+            
+            document.getElementById('bookTitle').innerText = data.title;
+            document.getElementById('bookSeriesName').innerText = `所屬套書系列：${data.series_name}`;
+
+            const tabList = document.getElementById('chapterTabs');
+            const tabContent = document.getElementById('chapterTabContent');
+            tabList.innerHTML = '';
+            tabContent.innerHTML = '';
+
+            data.chapters.forEach((ch, index) => {
+                const isActive = index === 0 ? 'active' : '';
+                
+                tabList.innerHTML += `
+                    <li class="nav-item">
+                        <button class="nav-link ${isActive} btn-sm" id="ch-tab-${index}" data-bs-toggle="tab" data-bs-target="#ch-content-${index}" type="button">${ch.title}</button>
+                    </li>`;
+                
+                tabContent.innerHTML += `
+                    <div class="tab-pane fade show ${isActive}" id="ch-content-${index}">
+                        <div style="white-space: pre-wrap;">${ch.content}</div>
+                    </div>`;
+            });
+
+            const reader = document.getElementById('readerArea');
+            reader.classList.remove('d-none');
+            reader.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // 6. 處理 EPUB 書籍上傳
         document.getElementById('uploadForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const fileInput = document.getElementById('epubFile');
             const formData = new FormData();
             formData.append('file', fileInput.files[0]);
 
-            // 顯示載入動畫
             document.getElementById('loading').classList.remove('d-none');
             document.getElementById('uploadBtn').disabled = true;
-            document.getElementById('resultArea').classList.add('d-none');
 
             try {
                 const response = await fetch('/upload', { method: 'POST', body: formData });
                 const data = await response.json();
                 
-                if (data.error) {
-                    alert(data.error);
-                    return;
-                }
+                if (data.error) { alert(data.error); return; }
 
-                // 渲染書籍資訊
-                document.getElementById('bookTitle').innerText = data.title;
-                document.getElementById('bookCategory').innerText = `系統自動分類：${data.category}`;
-
-                const tabList = document.getElementById('chapterTabs');
-                const tabContent = document.getElementById('chapterTabContent');
-                tabList.innerHTML = '';
-                tabContent.innerHTML = '';
-
-                // 動態產生標籤頁
-                data.chapters.forEach((ch, index) => {
-                    const isActive = index === 0 ? 'active' : '';
-                    const isSelected = index === 0 ? 'true' : 'false';
-                    
-                    tabList.innerHTML += `
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link ${isActive}" id="tab-${index}" data-bs-toggle="tab" data-bs-target="#content-${index}" type="button" role="tab" aria-selected="${isSelected}">${ch.title}</button>
-                        </li>`;
-                    
-                    tabContent.innerHTML += `
-                        <div class="tab-pane fade show ${isActive}" id="content-${index}" role="tabpanel">
-                            <div style="white-space: pre-wrap; line-height: 1.8; font-size: 1.1rem; color: #333;">${ch.content}</div>
-                        </div>`;
-                });
-
-                document.getElementById('resultArea').classList.remove('d-none');
+                fileInput.value = '';
+                await loadBooks();
+                openBook(data.id);
             } catch (err) {
-                alert('上傳失敗，請檢查伺服器連線');
+                alert('上傳失敗');
             } finally {
                 document.getElementById('loading').classList.add('d-none');
                 document.getElementById('uploadBtn').disabled = false;
