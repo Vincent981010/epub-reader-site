@@ -127,7 +127,7 @@
             font-weight: 600;
         }
 
-        /* 上傳區域控制面版 */
+        /* 上傳區域 */
         .upload-zone {
             border: 2px dashed #cbd5e0;
             border-radius: 8px;
@@ -162,7 +162,6 @@
             font-size: 0.85rem;
         }
 
-        /* 隱藏的原生 file inputs */
         input[type="file"] {
             display: none;
         }
@@ -287,7 +286,16 @@
             margin-top: 1.5rem;
         }
 
-        /* 進度條/通知提示 */
+        .toggle-auth {
+            font-size: 0.85rem;
+            color: var(--primary-color);
+            cursor: pointer;
+            text-align: center;
+            margin-top: 1rem;
+            text-decoration: underline;
+        }
+
+        /* 通知提示 */
         .toast-container {
             position: fixed;
             bottom: 2rem;
@@ -322,7 +330,6 @@
             <i class="fa-solid fa-book-open-reader"></i> 智能雲端書庫
         </div>
         <div class="user-panel" id="userPanel">
-            <!-- 這裡會由 JS 動態渲染登入狀態 -->
             <span>載入中...</span>
         </div>
     </header>
@@ -331,24 +338,19 @@
     <div class="container">
         <!-- 左側控制邊欄 -->
         <div class="sidebar">
-            <!-- 區塊一：多元批量上傳 -->
             <div class="sidebar-section">
                 <h3>書籍匯入</h3>
-                <!-- 可拖曳區域 -->
                 <div class="upload-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
-                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                    <i class="fa-cloud-arrow-up fa-solid"></i>
                     <p>將 EPUB 拖曳至此<br>或點擊上傳</p>
                 </div>
                 
-                <!-- 精細控制按鈕群 -->
                 <div class="upload-actions">
-                    <!-- 允許多選檔案 -->
                     <input type="file" id="fileInput" accept=".epub" multiple onchange="handleFileSelect(this.files)">
                     <button class="btn btn-outline" onclick="document.getElementById('fileInput').click()">
                         <i class="fa-solid fa-files"></i> 選擇多個檔案
                     </button>
                     
-                    <!-- 允許選擇整個資料夾 -->
                     <input type="file" id="folderInput" accept=".epub" webkitdirectory directory multiple onchange="handleFileSelect(this.files)">
                     <button class="btn btn-outline" onclick="document.getElementById('folderInput').click()">
                         <i class="fa-solid fa-folder-open"></i> 選擇整個資料夾
@@ -356,11 +358,10 @@
                 </div>
             </div>
 
-            <!-- 區塊二：書籍分類 -->
             <div class="sidebar-section">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                     <h3 style="margin: 0;">分流群組</h3>
-                    <button class="btn btn-outline" style="padding: 0.2rem 0.5rem; font-size: 0.8rem;" id="addSeriesBtn" style="display:none;" onclick="showAddSeriesModal()">+</button>
+                    <button class="btn btn-outline" style="padding: 0.2rem 0.5rem; font-size: 0.8rem; display: none;" id="addSeriesBtn" onclick="showAddSeriesModal()">+</button>
                 </div>
                 <ul class="category-list" id="seriesList">
                     <li class="category-item active">全部書籍</li>
@@ -368,36 +369,34 @@
             </div>
         </div>
 
-        <!-- 右側書籍主面板 -->
+        <!-- 右側主面板 -->
         <div class="main-content">
             <div class="content-header">
                 <h2 id="currentCategoryTitle">所有書籍</h2>
                 <span id="bookCount" style="color: var(--text-muted); font-size: 0.9rem;">共 0 本</span>
             </div>
             
-            <!-- 書籍列表網格 -->
-            <div class="book-grid" id="bookGrid">
-                <!-- 由 JavaScript 自動填充 -->
-            </div>
+            <div class="book-grid" id="bookGrid"></div>
         </div>
     </div>
 
-    <!-- 彈窗組件：會員登入 -->
-    <div class="modal" id="loginModal">
+    <!-- 複合型彈窗組件：會員登入 / 註冊 -->
+    <div class="modal" id="authModal">
         <div class="modal-content">
-            <div class="modal-header">會員登入</div>
+            <div class="modal-header" id="modalTitle">會員登入</div>
             <div class="form-group">
                 <label>帳號</label>
-                <input type="text" id="loginUser">
+                <input type="text" id="authUser">
             </div>
             <div class="form-group">
                 <label>密碼</label>
-                <input type="password" id="loginPass">
+                <input type="password" id="authPass">
             </div>
             <div class="modal-footer">
-                <button class="btn btn-outline" onclick="closeModal('loginModal')">取消</button>
-                <button class="btn btn-primary" onclick="submitLogin()">登入</button>
+                <button class="btn btn-outline" onclick="closeModal('authModal')">取消</button>
+                <button class="btn btn-primary" id="authSubmitBtn" onclick="handleAuthSubmit()">登入</button>
             </div>
+            <div class="toggle-auth" id="toggleAuthText" onclick="toggleAuthMode()">還沒有帳號？立即註冊</div>
         </div>
     </div>
 
@@ -416,22 +415,19 @@
         </div>
     </div>
 
-    <!-- 通知容器 -->
     <div class="toast-container" id="toastContainer"></div>
 
-    <!-- ⚡ 前端核心驅動腳本 -->
     <script>
         let currentBooks = [];
         let userInfo = { logged_in: false, username: '', is_admin: false };
+        let isRegisterMode = false; // 用來標記當前是登入還是註冊
 
-        // 頁面初始化
         window.addEventListener('DOMContentLoaded', () => {
             checkUserStatus();
             loadBooks();
             setupDragAndDrop();
         });
 
-        // 檢查登入狀態
         async function checkUserStatus() {
             try {
                 const res = await fetch('/user/status');
@@ -442,7 +438,6 @@
             }
         }
 
-        // 渲染頂部用戶面板
         function renderUserPanel() {
             const panel = document.getElementById('userPanel');
             const addSeriesBtn = document.getElementById('addSeriesBtn');
@@ -455,13 +450,87 @@
                 if (userInfo.is_admin) addSeriesBtn.style.display = 'block';
             } else {
                 panel.innerHTML = `
-                    <button class="btn btn-outline" onclick="showModal('loginModal')">會員登入</button>
+                    <button class="btn btn-outline" onclick="openAuthModal()">會員登入/註冊</button>
                 `;
                 addSeriesBtn.style.display = 'none';
             }
         }
 
-        // 載入所有書籍
+        // 開啟驗證彈窗，預設為登入模式
+        function openAuthModal() {
+            isRegisterMode = false;
+            document.getElementById('modalTitle').innerText = "會員登入";
+            document.getElementById('authSubmitBtn').innerText = "登入";
+            document.getElementById('toggleAuthText').innerText = "還沒有帳號？立即註冊";
+            document.getElementById('authUser').value = "";
+            document.getElementById('authPass').value = "";
+            showModal('authModal');
+        }
+
+        // 切換登入與註冊模式
+        function toggleAuthMode() {
+            isRegisterMode = !isRegisterMode;
+            if (isRegisterMode) {
+                document.getElementById('modalTitle').innerText = "註冊新帳號";
+                document.getElementById('authSubmitBtn').innerText = "註冊";
+                document.getElementById('toggleAuthText').innerText = "已有帳號？前往登入";
+            } else {
+                document.getElementById('modalTitle').innerText = "會員登入";
+                document.getElementById('authSubmitBtn').innerText = "登入";
+                document.getElementById('toggleAuthText').innerText = "還沒有帳號？立即註冊";
+            }
+        }
+
+        // 統一處理登入或註冊提交
+        async function handleAuthSubmit() {
+            const username = document.getElementById('authUser').value.trim();
+            const password = document.getElementById('authPass').value.trim();
+
+            if (!username || !password) {
+                alert("請填寫帳號與密碼！");
+                return;
+            }
+
+            if (isRegisterMode) {
+                // 執行註冊邏輯
+                const res = await fetch('/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const result = await res.json();
+                if (res.ok) {
+                    showToast("🟢 註冊成功！請直接登入");
+                    toggleAuthMode(); // 註冊完自動切回登入畫面
+                } else {
+                    alert("註冊失敗: " + (result.error || "帳號已被使用"));
+                }
+            } else {
+                // 執行登入邏輯
+                const res = await fetch('/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                if (res.ok) {
+                    closeModal('authModal');
+                    showToast("🟢 登入成功！歡迎回來");
+                    checkUserStatus();
+                    loadBooks();
+                } else {
+                    alert("登入失敗，請檢查您的帳號密碼是否正確！");
+                }
+            }
+        }
+
+        async function submitLogout() {
+            await fetch('/logout', { method: 'POST' });
+            showToast("🔒 已安全登出");
+            checkUserStatus();
+            loadBooks();
+        }
+
         async function loadBooks() {
             try {
                 const res = await fetch('/books');
@@ -473,7 +542,6 @@
             }
         }
 
-        // 渲染書籍網格面版
         function renderBookGrid(books) {
             const grid = document.getElementById('bookGrid');
             document.getElementById('bookCount').innerText = `共 ${books.length} 本`;
@@ -503,10 +571,8 @@
             `).join('');
         }
 
-        // 匯集並動態更新分類清單
         function updateSeriesList() {
             const list = document.getElementById('seriesList');
-            // 從書籍中抓取所有獨特的分類名稱
             const categories = ['全部書籍', ...new Set(currentBooks.map(b => b.series_name))];
             
             list.innerHTML = categories.map((cat, idx) => `
@@ -516,7 +582,6 @@
             `).join('');
         }
 
-        // 按分類過濾書籍
         function filterCategory(element, category) {
             document.querySelectorAll('.category-item').forEach(el => el.classList.remove('active'));
             element.classList.add('active');
@@ -530,16 +595,13 @@
             }
         }
 
-        // 核心功能：處理多檔案/資料夾批量上傳
         async function handleFileSelect(fileList) {
             if (fileList.length === 0) return;
 
             const formData = new FormData();
             let validCount = 0;
 
-            // 把選取到的所有檔案依序打包進 FormData 中
             for (let i = 0; i < fileList.length; i++) {
-                // 過濾，只允許 .epub 檔案
                 if (fileList[i].name.endsWith('.epub') || fileList[i].type === "application/epub+zip") {
                     formData.append('file', fileList[i]);
                     validCount++;
@@ -562,10 +624,7 @@
                 const result = await response.json();
                 if (response.ok) {
                     showToast(`🎉 ${result.message}`);
-                    if (result.errors && result.errors.length > 0) {
-                        console.warn("部分檔案有問題:", result.errors);
-                    }
-                    loadBooks(); // 重新整理列表
+                    loadBooks();
                 } else {
                     alert("上傳失敗: " + result.error);
                 }
@@ -575,7 +634,6 @@
             }
         }
 
-        // 拖曳上傳控制邏輯
         function setupDragAndDrop() {
             const dropZone = document.getElementById('dropZone');
 
@@ -600,34 +658,6 @@
             }, false);
         }
 
-        // 🔐 會員控制網絡請求
-        async function submitLogin() {
-            const username = document.getElementById('loginUser').value;
-            const password = document.getElementById('loginPass').value;
-            
-            const res = await fetch('/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
-            });
-
-            if (res.ok) {
-                closeModal('loginModal');
-                showToast("🟢 登入成功！歡迎回來");
-                checkUserStatus();
-                loadBooks();
-            } else {
-                alert("登入失敗，預設管理者密碼為 admin123 唷！");
-            }
-        }
-
-        async function submitLogout() {
-            await fetch('/logout', { method: 'POST' });
-            showToast("🔒 已安全登出");
-            checkUserStatus();
-            loadBooks();
-        }
-
         async function submitCreateSeries() {
             const name = document.getElementById('newSeriesName').value;
             const res = await fetch('/series', {
@@ -646,12 +676,17 @@
             }
         }
 
-        // 視窗 UI 控制
         function showModal(id) { document.getElementById(id).style.display = 'flex'; }
         function closeModal(id) { document.getElementById(id).style.display = 'none'; }
         function showAddSeriesModal() { showModal('seriesModal'); }
 
-        // 右下角黑底提示框
+        document.getElementById('authModal').addEventListener('click', function(e) {
+            if(e.target === this) closeModal('authModal');
+        });
+        document.getElementById('seriesModal').addEventListener('click', function(e) {
+            if(e.target === this) closeModal('seriesModal');
+        });
+
         function showToast(text) {
             const container = document.getElementById('toastContainer');
             const toast = document.createElement('div');
