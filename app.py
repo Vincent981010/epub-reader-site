@@ -1,7 +1,6 @@
 import os
 from flask import Flask, request, jsonify, render_template
 import ebooklib
-from epub_meta import get_epub_metadata  # 備用解析庫
 from ebooklib import epub
 from bs4 import BeautifulSoup
 import psycopg2
@@ -22,7 +21,7 @@ def init_db():
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    # ⚠️ 核心修正：強制清除舊架構，避免舊欄位殘留導致 Render 啟動崩潰 (Status 1)
+    # 強制清除舊架構，避免舊欄位殘留導致 Render 啟動崩潰 (Status 1)
     cursor.execute('DROP TABLE IF EXISTS chapters, books, series CASCADE')
     
     # 1. 建立「書籍系列」表（例如：哈利波特、魔戒）
