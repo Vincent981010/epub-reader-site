@@ -2,11 +2,10 @@ import os
 from flask import Flask, request, jsonify, render_template, session
 
 app = Flask(__name__)
-app.secret_key = 'your_secret_key' 
+app.secret_key = 'your_secret_key'
 UPLOAD_FOLDER = 'static/uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# 初始化為空，移除所有範例書籍
 books_db = []
 
 @app.route('/')
@@ -22,13 +21,8 @@ def upload():
     files = request.files.getlist('file')
     for file in files:
         if file and file.filename.endswith('.epub'):
-            save_path = os.path.join(UPLOAD_FOLDER, file.filename)
-            file.save(save_path)
-            books_db.append({
-                "id": str(len(books_db)+1), 
-                "title": file.filename, 
-                "file_url": f"/static/uploads/{file.filename}"
-            })
+            file.save(os.path.join(UPLOAD_FOLDER, file.filename))
+            books_db.append({"id": str(len(books_db)+1), "title": file.filename, "file_url": f"/static/uploads/{file.filename}"})
     return jsonify({"status": "success"}), 200
 
 @app.route('/books/delete', methods=['POST'])
@@ -36,7 +30,6 @@ def delete_books():
     data = request.get_json()
     ids = data.get('ids', [])
     global books_db
-    # 刪除實體檔案與列表更新
     books_db = [b for b in books_db if b['id'] not in ids]
     return jsonify({"status": "deleted"}), 200
 
