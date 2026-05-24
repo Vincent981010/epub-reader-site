@@ -2,99 +2,89 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>智能雲端書庫</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* CSS Reset & Basic Layout */
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Segoe UI', sans-serif; background-color: #f3f4f6; padding: 20px; }
-        .app-container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        
-        /* Header & Controls */
-        .toolbar { display: flex; gap: 10px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid #eee; align-items: center; }
-        
-        /* Book Grid Layout - 這是最穩定的設定 */
-        .book-grid { 
-            display: grid; 
-            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); 
-            gap: 15px; 
-            min-height: 200px;
-        }
-        
-        .book-card { 
-            border: 1px solid #e5e7eb; padding: 15px; border-radius: 8px; 
-            text-align: center; position: relative; background: #fff;
-            transition: transform 0.2s;
-        }
-        .book-card:hover { border-color: #3b82f6; }
-        
-        .checkbox-container { position: absolute; top: 8px; left: 8px; z-index: 10; }
-        
-        .btn { padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; font-size: 0.9rem; }
-        .btn-primary { background: #3b82f6; color: white; }
-        .btn-danger { background: #ef4444; color: white; }
+        :root { --primary-color: #3b82f6; --bg-body: #f3f4f6; --bg-panel: #ffffff; --border-color: #e5e7eb; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; background-color: var(--bg-body); }
+        .container { display: flex; max-width: 1400px; margin: 0 auto; padding: 20px; gap: 20px; }
+        .sidebar { width: 280px; background: var(--bg-panel); padding: 1.5rem; border-radius: 8px; }
+        .main-content { flex: 1; background: var(--bg-panel); padding: 2rem; border-radius: 8px; }
+        .content-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; }
+        .book-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 1.5rem; }
+        .book-card { background: #fff; border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem; text-align: center; cursor: pointer; position: relative; }
+        .btn { padding: 0.5rem 1rem; border-radius: 6px; border: none; cursor: pointer; }
+        .btn-primary { background: var(--primary-color); color: white; }
+        .btn-outline { background: transparent; border: 1px solid var(--border-color); }
     </style>
 </head>
 <body>
-
-<div class="app-container">
-    <h2>雲端書庫</h2>
-    <div class="toolbar">
-        <input type="file" id="fileInput" multiple onchange="handleFileSelect(this.files)">
-        <button class="btn" onclick="toggleSelectionMode()" id="toggleBtn">選取刪除</button>
-        <button class="btn btn-danger" onclick="deleteSelected()" id="deleteBtn" style="display:none;">執行刪除</button>
+    <div class="container">
+        <div class="sidebar"><h3>分類系統</h3></div>
+        <div class="main-content">
+            <div class="content-header">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <h2 id="currentCategoryTitle">全部書籍</h2>
+                    <input type="file" id="uploadInput" multiple style="display:none" onchange="handleFileSelect(this.files)">
+                    <button class="btn btn-primary" onclick="document.getElementById('uploadInput').click()">上傳書籍</button>
+                    <button class="btn btn-outline" id="selectModeBtn" onclick="toggleSelectionMode()">選取刪除</button>
+                    <button class="btn btn-primary" id="deleteBtn" onclick="deleteSelected()" style="display: none; background: #ef4444;">刪除所選</button>
+                </div>
+                <span id="bookCount">共 0 本</span>
+            </div>
+            <div class="book-grid" id="bookGrid"></div>
+        </div>
     </div>
 
-    <div class="book-grid" id="bookGrid">
-        <!-- 內容會由 JS 渲染 -->
-    </div>
-</div>
+    <script>
+        let isSelectionMode = false;
+        let currentBooks = [];
 
-<script>
-    let isSelectionMode = false;
-
-    function toggleSelectionMode() {
-        isSelectionMode = !isSelectionMode;
-        document.getElementById('toggleBtn').innerText = isSelectionMode ? '取消' : '選取刪除';
-        document.getElementById('deleteBtn').style.display = isSelectionMode ? 'inline-block' : 'none';
-        renderGrid();
-    }
-
-    async function renderGrid() {
-        try {
+        // 初始化載入書籍
+        async function loadBooks() {
             const res = await fetch('/books');
-            const books = await res.json();
+            currentBooks = await res.json();
+            renderBookGrid('全部書籍');
+        }
+
+        function toggleSelectionMode() {
+            isSelectionMode = !isSelectionMode;
+            document.getElementById('selectModeBtn').innerText = isSelectionMode ? '取消選取' : '選取刪除';
+            document.getElementById('deleteBtn').style.display = isSelectionMode ? 'block' : 'none';
+            renderBookGrid('全部書籍');
+        }
+
+        function renderBookGrid(category) {
             const grid = document.getElementById('bookGrid');
-            grid.innerHTML = books.map(b => `
-                <div class="book-card">
-                    ${isSelectionMode ? `<div class="checkbox-container"><input type="checkbox" class="book-checkbox" value="${b.id}"></div>` : ''}
-                    <div style="margin-top: 20px;">${b.title}</div>
+            grid.innerHTML = currentBooks.map(b => `
+                <div class="book-card" onclick="if(!isSelectionMode) openReader('${b.file_url}', '${b.title}')">
+                    ${isSelectionMode ? `<input type="checkbox" class="book-checkbox" value="${b.id}" onclick="event.stopPropagation()">` : ''}
+                    <div class="book-title">${b.title}</div>
                 </div>
             `).join('');
-        } catch (e) { console.error("渲染失敗", e); }
-    }
+            document.getElementById('bookCount').innerText = `共 ${currentBooks.length} 本`;
+        }
 
-    async function handleFileSelect(files) {
-        const formData = new FormData();
-        for (let f of files) formData.append('file', f);
-        await fetch('/upload', { method: 'POST', body: formData });
-        location.reload();
-    }
+        async function deleteSelected() {
+            const selectedIds = Array.from(document.querySelectorAll('.book-checkbox:checked')).map(cb => cb.value);
+            if (selectedIds.length === 0) return alert('請選擇要刪除的書籍');
+            const res = await fetch('/books/delete', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ ids: selectedIds })
+            });
+            if (res.ok) { loadBooks(); toggleSelectionMode(); }
+        }
 
-    async function deleteSelected() {
-        const ids = Array.from(document.querySelectorAll('.book-checkbox:checked')).map(cb => cb.value);
-        if(ids.length === 0) return alert("請先勾選書籍");
-        
-        await fetch('/books/delete', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ ids: ids })
-        });
-        location.reload();
-    }
+        async function handleFileSelect(files) {
+            const formData = new FormData();
+            for (let f of files) formData.append('file', f);
+            await fetch('/upload', { method: 'POST', body: formData });
+            loadBooks();
+        }
 
-    // 初始化
-    renderGrid();
-</script>
+        loadBooks(); // 頁面載入時執行
+        function openReader(url, title) { alert("開啟閱讀器: " + title); }
+    </script>
 </body>
 </html>
