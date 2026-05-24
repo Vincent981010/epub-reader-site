@@ -61,16 +61,46 @@ def upload():
     
     files = request.files.getlist('file')
     for file in files:
-        if file and file.filename.endswith('.epub'):
+        if file and (file.filename.endswith('.epub') or file.mimetype == 'application/epub+zip'):
             filename = secure_filename(file.filename)
             file.save(os.path.join(UPLOAD_FOLDER, filename))
+            # 產生簡單的 ID 供刪除時辨識
+            import uuid
+            unique_id = str(uuid.uuid4())[:8]
+            
             books_db.append({
-                "id": str(len(books_db) + 1),
+                "id": unique_id,
                 "title": filename,
                 "file_url": f"/static/uploads/{filename}",
                 "series_name": "預設分類"
             })
     return jsonify({'status': 'success'})
+
+@app.route('/books/<book_id>', methods=['DELETE'])
+def delete_book(book_id):
+    # 限制僅登入用戶可刪除
+    if 'username' not in session:
+        return jsonify({'error': '請先登入'}), 401
+        
+    global books_db
+    book_to_delete = next((b for b in books_db if b["id"] == book_id), None)
+    
+    if book_to_delete:
+        # 從資料庫陣列中移除
+        books_db = [b for b in books_db if b["id"] != book_id]
+        
+        # 嘗試從伺服器本機刪除實體檔案以釋放空間
+        try:
+            # 移除開頭的斜線，將 /static/uploads/... 轉為相對路徑 static/uploads/...
+            file_path = book_to_delete["file_url"].lstrip('/')
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        except Exception as e:
+            print(f"檔案刪除失敗: {e}")
+            
+        return jsonify({'status': 'success'})
+        
+    return jsonify({'error': '找不到該書籍'}), 404
 
 if __name__ == '__main__':
     app.run(debug=True)
