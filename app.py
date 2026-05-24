@@ -2,14 +2,13 @@ import os
 from flask import Flask, request, jsonify, render_template, session
 
 app = Flask(__name__)
-app.secret_key = 'your_secret_key' # 請自行更換為複雜字串
+# 設定 Session 金鑰以支援登入狀態管理[cite: 1]
+app.secret_key = 'your_secure_secret_key' 
 UPLOAD_FOLDER = 'static/uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# 模擬資料庫 (建議換成實際資料庫)
-books_db = [
-    {"id": "1", "title": "範例書籍.epub", "file_url": "/static/uploads/test.epub", "series_name": "預設分類"}
-]
+# 初始化資料庫為空列表，移除所有範例書籍[cite: 1]
+books_db = []
 
 @app.route('/')
 def index():
@@ -24,8 +23,18 @@ def upload():
     files = request.files.getlist('file')
     for file in files:
         if file and file.filename.endswith('.epub'):
-            file.save(os.path.join(UPLOAD_FOLDER, file.filename))
-            books_db.append({"id": str(len(books_db)+1), "title": file.filename, "file_url": f"/static/uploads/{file.filename}", "series_name": "預設分類"})
+            # 儲存檔案到伺服器磁碟[cite: 1]
+            save_path = os.path.join(UPLOAD_FOLDER, file.filename)
+            file.save(save_path)
+            
+            # 將檔案資訊加入資料庫[cite: 1]
+            new_id = str(len(books_db) + 1)
+            books_db.append({
+                "id": new_id, 
+                "title": file.filename, 
+                "file_url": f"/static/uploads/{file.filename}", 
+                "series_name": "未分類"
+            })
     return jsonify({"status": "success"}), 200
 
 @app.route('/books/delete', methods=['POST'])
@@ -33,11 +42,22 @@ def delete_books():
     data = request.get_json()
     ids_to_delete = data.get('ids', [])
     global books_db
-    # 過濾掉被選取的書籍
-    books_db = [b for b in books_db if b['id'] not in ids_to_delete]
+    
+    # 同步刪除實體檔案與資料庫列表[cite: 1]
+    new_db = []
+    for b in books_db:
+        if b['id'] in ids_to_delete:
+            # 刪除磁碟中的 EPUB 檔案[cite: 1]
+            file_path = os.path.join(UPLOAD_FOLDER, b['title'])
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        else:
+            new_db.append(b)
+    
+    books_db = new_db
     return jsonify({"status": "deleted"}), 200
 
-# 用戶狀態與認證 (配合前端邏輯)
+# 用戶狀態管理，修復前端無限載入迴圈問題[cite: 1]
 @app.route('/user/status', methods=['GET'])
 def get_user_status():
     return jsonify(session.get('user', {"logged_in": False}))
