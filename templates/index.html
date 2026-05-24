@@ -2,74 +2,46 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>智能雲端書庫</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/epub.js/0.3.88/epub.min.js"></script>
     <style>
-        /* 基礎樣式 */
-        body { font-family: 'Segoe UI', sans-serif; background-color: #f5f7fa; margin: 0; color: #333; }
-        header { padding: 1.5rem 2rem; background: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; }
+        /* 1. 你指定的 Loading 遮罩樣式 */
+        #loading-overlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.8); z-index:9999; justify-content:center; align-items:center; }
         
-        /* Loading 遮罩 */
-        #loading-overlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.9); z-index:9999; justify-content:center; align-items:center; font-size: 1.5rem; }
-        
-        /* 網格系統 */
-        .container { max-width: 1200px; margin: 2rem auto; display: grid; grid-template-columns: 280px 1fr; gap: 2rem; padding: 0 1rem; }
-        .sidebar { background: white; padding: 1.5rem; border-radius: 8px; border: 1px solid #ddd; height: fit-content; }
-        .book-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1.5rem; }
-        
-        /* 書籍卡片 */
-        .book-card { background: white; padding: 1.5rem; border-radius: 8px; border: 1px solid #ddd; box-shadow: 0 2px 4px rgba(0,0,0,0.05); transition: transform 0.2s; }
-        .book-card:hover { transform: translateY(-5px); }
-        .book-card strong { display: block; margin-bottom: 0.5rem; font-size: 1.1rem; }
+        /* 2. 原本的網頁排版樣式 */
+        body { font-family: sans-serif; margin: 0; display: flex; flex-direction: column; }
+        header { padding: 1rem; background: #eee; }
+        .main-container { display: flex; padding: 20px; }
+        #sidebar { width: 250px; }
+        #bookGrid { display: flex; flex-wrap: wrap; gap: 15px; }
+        .book-card { border: 1px solid #ccc; padding: 10px; width: 150px; }
     </style>
 </head>
 <body>
     <div id="loading-overlay">處理中...請稍候</div>
 
     <header>
-        <div class="logo"><h1>智能雲端書庫</h1></div>
-        <div id="userPanel"></div>
+        <h1>智能雲端書庫</h1>
+        <div id="auth-section">
+            <!-- 登入表單 -->
+            <input type="text" id="username" placeholder="帳號">
+            <input type="password" id="password" placeholder="密碼">
+            <button onclick="handleLogin(document.getElementById('username').value, document.getElementById('password').value)">登入</button>
+        </div>
     </header>
 
-    <div class="container">
-        <aside class="sidebar">
+    <div class="main-container">
+        <div id="sidebar">
             <h3>分類列表</h3>
             <div id="seriesList"></div>
-        </aside>
-        
-        <main>
-            <div id="bookGrid" class="book-grid">
-                <!-- 書籍將動態載入至此 -->
-            </div>
-        </main>
+        </div>
+        <div id="bookGrid">
+            <!-- 書籍內容會透過 JS 載入 -->
+        </div>
     </div>
     
     <script>
-        // 載入書籍並渲染
-        async function loadBooks() {
-            try {
-                const res = await fetch('/books');
-                const books = await res.json();
-                const grid = document.getElementById('bookGrid');
-                
-                if (books.length === 0) {
-                    grid.innerHTML = '<p>目前沒有書籍</p>';
-                    return;
-                }
-
-                grid.innerHTML = books.map(b => `
-                    <div class="book-card">
-                        <strong>${b.title}</strong>
-                        <small>分類: ${b.series_name || '預設分類'}</small>
-                    </div>
-                `).join('');
-            } catch(e) {
-                console.error("載入失敗:", e);
-            }
-        }
-
-        // 登入邏輯
+        // 你指定的優化版登入函式
         async function handleLogin(username, password) {
             const overlay = document.getElementById('loading-overlay');
             overlay.style.display = 'flex';
@@ -85,10 +57,31 @@
                 } else {
                     alert(data.message);
                 }
-            } catch(e) { console.error(e); } 
-            finally { overlay.style.display = 'none'; }
+            } catch(e) {
+                console.error(e);
+            } finally {
+                overlay.style.display = 'none';
+            }
         }
 
+        // 載入書籍清單的邏輯
+        async function loadBooks() {
+            try {
+                const response = await fetch('/books');
+                const books = await response.json();
+                const grid = document.getElementById('bookGrid');
+                grid.innerHTML = books.map(b => `
+                    <div class="book-card">
+                        <strong>${b.title}</strong>
+                        <p>${b.series_name || '未分類'}</p>
+                    </div>
+                `).join('');
+            } catch (e) {
+                console.error("載入失敗:", e);
+            }
+        }
+
+        // 頁面載入時自動執行
         window.onload = loadBooks;
     </script>
 </body>
