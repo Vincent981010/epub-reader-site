@@ -1,43 +1,50 @@
 import os
-from flask import Flask, request, jsonify, session
+from flask import Flask, request, jsonify, render_template
 
 app = Flask(__name__)
-app.secret_key = 'your_secret_key' # 請自行更換
 
-# 設定上傳目錄
+# 設定上傳路徑
 UPLOAD_FOLDER = 'static/uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# --- 處理多檔案上傳 ---
+# 進入首頁
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+# 取得書籍列表 (回傳範例資料)
+@app.route('/books', methods=['GET'])
+def get_books():
+    # 這裡未來連接你的資料庫
+    return jsonify([
+        {"id": "1", "title": "測試書籍1.epub", "file_url": "/static/uploads/test1.epub", "series_name": "範例分類"}
+    ])
+
+# 多檔案上傳
 @app.route('/upload', methods=['POST'])
 def upload():
-    # 檢查是否登入
-    if 'user' not in session: return jsonify({"error": "Unauthorized"}), 401
-    
-    files = request.files.getlist('file') # 關鍵：使用 getlist 接收多個檔案
+    files = request.files.getlist('file')
     for file in files:
         if file and file.filename.endswith('.epub'):
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
-            file.save(file_path)
-            # 這裡加入你的資料庫存入邏輯 (例如：db.insert(file.filename, file_path))
+            file.save(os.path.join(app.config['UPLOAD_FOLDER'], file.filename))
     return jsonify({"message": "success"}), 200
 
-# --- 處理批次刪除 ---
+# 批次刪除書籍
 @app.route('/books/delete', methods=['POST'])
 def delete_books():
-    if 'user' not in session: return jsonify({"error": "Unauthorized"}), 401
-    
     data = request.get_json()
-    ids_to_delete = data.get('ids', [])
-    
-    # 在此執行刪除資料庫紀錄，並刪除實體檔案
-    # for book_id in ids_to_delete:
-    #     db.execute("DELETE FROM books WHERE id = ?", book_id)
-    
-    return jsonify({"message": f"Successfully deleted {len(ids_to_delete)} books"}), 200
+    ids = data.get('ids', [])
+    print(f"Server received delete request for IDs: {ids}")
+    # 這裡執行資料庫刪除邏輯
+    return jsonify({"message": f"Deleted {len(ids)} books"}), 200
 
-# ... 其他路由 (login, status, update_category) ...
+# 修改分類
+@app.route('/books/update_category', methods=['POST'])
+def update_category():
+    data = request.get_json()
+    # 更新資料庫邏輯
+    return jsonify({"message": "updated"}), 200
 
 if __name__ == '__main__':
     app.run(debug=True)
