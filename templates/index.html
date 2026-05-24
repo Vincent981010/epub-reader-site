@@ -5,124 +5,101 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>智能雲端書庫</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/epub.js/0.3.88/epub.min.js"></script>
     <style>
-        /* 保留原有的樣式設定 */
-        :root { --primary-color: #3b82f6; --primary-hover: #2563eb; --text-main: #1f2937; --text-muted: #6b7280; --bg-body: #f3f4f6; --bg-panel: #ffffff; --border-color: #e5e7eb; }
-        body { font-family: 'Segoe UI', sans-serif; margin: 0; background-color: var(--bg-body); color: var(--text-main); display: flex; flex-direction: column; min-height: 100vh; }
-        header { background-color: var(--bg-panel); padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); }
-        .container { display: flex; flex: 1; max-width: 1400px; margin: 0 auto; width: 100%; padding: 20px; gap: 20px; box-sizing: border-box; }
+        /* 引用自 index_3.html 的樣式與佈局 */
+        :root { --primary-color: #3b82f6; --bg-body: #f3f4f6; --bg-panel: #ffffff; --border-color: #e5e7eb; }
+        body { font-family: sans-serif; margin: 0; background-color: var(--bg-body); display: flex; flex-direction: column; min-height: 100vh; }
+        .container { display: flex; flex: 1; max-width: 1400px; margin: 0 auto; padding: 20px; gap: 20px; }
         .sidebar { width: 280px; background: var(--bg-panel); padding: 1.5rem; border-radius: 8px; height: fit-content; }
-        .sidebar-section { margin-bottom: 2rem; }
-        .sidebar-section h3 { font-size: 1.1rem; margin-top: 0; margin-bottom: 1rem; border-bottom: 2px solid var(--border-color); padding-bottom: 0.5rem; }
-        .upload-zone { border: 2px dashed #cbd5e0; border-radius: 8px; padding: 2rem 1rem; text-align: center; cursor: pointer; background: #fafafa; margin-bottom: 1rem; }
-        .btn { padding: 0.5rem 1rem; border-radius: 6px; border: none; cursor: pointer; font-size: 0.9rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem; }
-        .btn-primary { background: var(--primary-color); color: white; }
-        .btn-outline { background: transparent; border: 1px solid var(--border-color); color: var(--text-main); }
-        .category-list { list-style: none; padding: 0; margin: 0; }
-        .category-item { padding: 0.75rem 1rem; border-radius: 6px; cursor: pointer; margin-bottom: 0.25rem; color: var(--text-muted); }
-        .category-item.active { background: #eff6ff; color: var(--primary-color); font-weight: 600; }
         .main-content { flex: 1; background: var(--bg-panel); padding: 2rem; border-radius: 8px; }
-        .content-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; }
         .book-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 1.5rem; }
-        .book-card { background: #fff; border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem; text-align: center; cursor: pointer; position: relative; }
-        .book-checkbox { position: absolute; top: 10px; left: 10px; transform: scale(1.5); }
-        #loading-overlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.8); z-index:9999; justify-content:center; align-items:center; }
+        .book-card { background: #fff; border: 1px solid var(--border-color); padding: 1rem; border-radius: 8px; text-align: center; position: relative; }
+        .btn { padding: 0.5rem 1rem; border-radius: 6px; border: none; cursor: pointer; }
+        .btn-primary { background: var(--primary-color); color: white; }
     </style>
 </head>
 <body>
-    <div id="loading-overlay">處理中...</div>
-
-    <header>
-        <div class="logo"><i class="fa-solid fa-book-open-reader"></i> 智能雲端書庫</div>
-        <div class="user-panel" id="userPanel"><span>載入中...</span></div>
+    <header style="padding: 1rem 2rem; border-bottom: 1px solid #ddd; background: white;">
+        <div class="logo">智能雲端書庫</div>
     </header>
 
     <div class="container">
         <div class="sidebar">
-            <div class="sidebar-section">
-                <h3>書籍匯入</h3>
-                <div class="upload-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
-                    <i class="fa-solid fa-cloud-arrow-up"></i>
-                    <p>選擇 EPUB 檔案</p>
-                </div>
-                <input type="file" id="fileInput" accept=".epub" multiple onchange="handleFileSelect(this.files)" style="display:none">
-            </div>
-            
-            <div class="sidebar-section">
-                <h3>分流群組</h3>
-                <ul class="category-list" id="seriesList">
-                    <li class="category-item active" onclick="filterCategory(this, '全部書籍')">全部書籍</li>
-                </ul>
-            </div>
+            <h3>書籍匯入</h3>
+            <input type="file" id="fileInput" multiple onchange="handleFileSelect(this.files)" style="display:none">
+            <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">上傳書籍</button>
         </div>
-
         <div class="main-content">
-            <div class="content-header">
-                <h2 id="currentCategoryTitle">所有書籍</h2>
-                <!-- 新增選取模式按鈕 -->
+            <div class="content-header" style="display:flex; justify-content: space-between;">
+                <h2>所有書籍</h2>
                 <div>
-                    <button class="btn btn-outline" id="selectModeBtn" onclick="toggleSelectionMode()">選取刪除</button>
-                    <button class="btn btn-primary" id="deleteBtn" onclick="deleteSelected()" style="display: none; background: #ef4444;">刪除所選</button>
+                    <button class="btn" id="selectModeBtn" onclick="toggleSelectionMode()">選取刪除</button>
+                    <button class="btn" id="deleteBtn" style="display:none; background:#ef4444; color:white;" onclick="deleteSelected()">刪除所選</button>
                 </div>
-                <span id="bookCount" style="color: var(--text-muted); font-size: 0.9rem;">共 0 本</span>
             </div>
             <div class="book-grid" id="bookGrid"></div>
         </div>
     </div>
 
     <script>
+        let isSelectionMode = false;
         let currentBooks = [];
-        let isSelectionMode = false; // 新增選取狀態變數
 
-        // 切換選取模式
+        // 初始化載入
+        window.addEventListener('DOMContentLoaded', () => { loadBooks(); });
+
+        async function loadBooks() {
+            try {
+                const res = await fetch('/books');
+                currentBooks = await res.json();
+                renderBookGrid();
+            } catch(e) { console.error(e); }
+        }
+
+        // 切換模式
         function toggleSelectionMode() {
             isSelectionMode = !isSelectionMode;
             document.getElementById('selectModeBtn').innerText = isSelectionMode ? '取消選取' : '選取刪除';
-            document.getElementById('deleteBtn').style.display = isSelectionMode ? 'flex' : 'none';
-            renderBookGrid(currentBooks);
+            document.getElementById('deleteBtn').style.display = isSelectionMode ? 'inline-block' : 'none';
+            renderBookGrid();
         }
 
-        //[cite: 1] 批次刪除邏輯
-        async function deleteSelected() {
-            const selectedIds = Array.from(document.querySelectorAll('.book-checkbox:checked')).map(cb => cb.value);
-            if (selectedIds.length === 0) return alert('請先勾選書籍');
-            if (!confirm(`確定要刪除 ${selectedIds.length} 本書嗎？`)) return;
-
-            const res = await fetch('/books/delete', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ ids: selectedIds })
-            });
-            if (res.ok) {
-                alert("刪除成功");
-                isSelectionMode = false; // 重置模式
-                toggleSelectionMode();
-                loadBooks();
-            }
-        }
-
-        //[cite: 1] 渲染網格 (已加入 Checkbox 判斷)
-        function renderBookGrid(books) {
+        // 渲染網格[cite: 1]
+        function renderBookGrid() {
             const grid = document.getElementById('bookGrid');
-            grid.innerHTML = books.map(b => `
+            grid.innerHTML = currentBooks.map(b => `
                 <div class="book-card">
                     ${isSelectionMode ? `<input type="checkbox" class="book-checkbox" value="${b.id}">` : ''}
-                    <div class="book-title">${b.title.replace('.epub', '')}</div>
+                    <div class="book-title">${b.title}</div>
                 </div>
             `).join('');
         }
 
-        // ... 保留你原有的 loadBooks, handleFileSelect 等其他函式 ...
-        async function loadBooks() {
-            const res = await fetch('/books');
-            if (res.ok) {
-                currentBooks = await res.json();
-                renderBookGrid(currentBooks);
+        // 刪除邏輯[cite: 1]
+        async function deleteSelected() {
+            const ids = Array.from(document.querySelectorAll('.book-checkbox:checked')).map(cb => cb.value);
+            if(ids.length === 0) return alert("請先勾選");
+            
+            const res = await fetch('/books/delete', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ ids: ids })
+            });
+            
+            if(res.ok) {
+                alert("刪除成功");
+                isSelectionMode = false;
+                document.getElementById('deleteBtn').style.display = 'none';
+                await loadBooks(); // 刪除後立即重新載入資料
             }
         }
-        
-        loadBooks();
+
+        async function handleFileSelect(files) {
+            const formData = new FormData();
+            for (let f of files) formData.append('file', f);
+            await fetch('/upload', { method: 'POST', body: formData });
+            loadBooks();
+        }
     </script>
 </body>
 </html>
