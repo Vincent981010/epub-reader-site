@@ -1,6 +1,6 @@
 import os
+import uuid
 from flask import Flask, request, jsonify, render_template, session
-from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 # 請確保 secret_key 設定正確以維護 Session 安全
@@ -62,23 +62,40 @@ def upload():
     files = request.files.getlist('file')
     for file in files:
         if file and (file.filename.endswith('.epub') or file.mimetype == 'application/epub+zip'):
-            filename = secure_filename(file.filename)
-            file.save(os.path.join(UPLOAD_FOLDER, filename))
-            # 產生簡單的 ID 供刪除時辨識
-            import uuid
-            unique_id = str(uuid.uuid4())[:8]
+            # 解決 secure_filename 吃掉中文檔名的問題，改用 UUID 存實體檔案
+            ext = os.path.splitext(file.filename)[1]
+            unique_filename = f"{uuid.uuid4().hex}{ext}"
+            file.save(os.path.join(UPLOAD_FOLDER, unique_filename))
             
             books_db.append({
-                "id": unique_id,
-                "title": filename,
-                "file_url": f"/static/uploads/{filename}",
+                "id": str(uuid.uuid4())[:8],
+                "title": file.filename,  # 顯示時維持原始中文檔名
+                "file_url": f"/static/uploads/{unique_filename}",
                 "series_name": "預設分類"
             })
     return jsonify({'status': 'success'})
 
+# 修改分類 API
+@app.route('/books/<book_id>', methods=['PUT'])
+def update_book(book_id):
+    if 'username' not in session:
+        return jsonify({'error': '請先登入'}), 401
+        
+    data = request.json
+    new_series = data.get('series_name')
+    
+    if not new_series:
+        return jsonify({'error': '分類名稱不能為空'}), 400
+        
+    for book in books_db:
+        if book["id"] == book_id:
+            book["series_name"] = new_series
+            return jsonify({'status': 'success'})
+            
+    return jsonify({'error': '找不到該書籍'}), 404
+
 @app.route('/books/<book_id>', methods=['DELETE'])
 def delete_book(book_id):
-    # 限制僅登入用戶可刪除
     if 'username' not in session:
         return jsonify({'error': '請先登入'}), 401
         
@@ -86,12 +103,9 @@ def delete_book(book_id):
     book_to_delete = next((b for b in books_db if b["id"] == book_id), None)
     
     if book_to_delete:
-        # 從資料庫陣列中移除
         books_db = [b for b in books_db if b["id"] != book_id]
         
-        # 嘗試從伺服器本機刪除實體檔案以釋放空間
         try:
-            # 移除開頭的斜線，將 /static/uploads/... 轉為相對路徑 static/uploads/...
             file_path = book_to_delete["file_url"].lstrip('/')
             if os.path.exists(file_path):
                 os.remove(file_path)
