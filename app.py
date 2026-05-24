@@ -17,7 +17,6 @@ Session(app)
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 
-# 自動防呆相容新舊金鑰格式
 supabase_options = ClientOptions(
     postgrest_client_timeout=10,
     headers={"apiKey": SUPABASE_KEY} if SUPABASE_KEY else {}
@@ -32,7 +31,6 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 @app.route('/')
 def index():
-    """唯一的主頁面"""
     return render_template('index.html')
 
 # --- 3. JSON API 接口：使用者認證系統 ---
@@ -56,11 +54,9 @@ def register():
             "password": password,
             "is_admin": False
         }).execute()
-        
         return jsonify({"status": "success", "message": "註冊成功！請登入"}), 200
     except Exception as e:
         return jsonify({"status": "error", "message": f"註冊失敗：{str(e)}"}), 500
-
 
 @app.route('/login', methods=['POST'])
 def login():
@@ -80,17 +76,14 @@ def login():
                 "message": f"歡迎回來，{username}！",
                 "user": {"username": username, "is_admin": session['is_admin']}
             }), 200
-        else:
-            return jsonify({"status": "error", "message": "帳號或密碼錯誤！"}), 401
+        return jsonify({"status": "error", "message": "帳號或密碼錯誤！"}), 401
     except Exception as e:
-        return jsonify({"status": "error", "message": f"登入驗證時出錯：{str(e)}"}), 500
-
+        return jsonify({"status": "error", "message": f"登入出錯：{str(e)}"}), 500
 
 @app.route('/logout', methods=['POST', 'GET'])
 def logout():
     session.clear()
     return jsonify({"status": "success", "message": "您已成功登出"}), 200
-
 
 @app.route('/user/status', methods=['GET'])
 def api_user_status():
@@ -106,65 +99,71 @@ def api_user_status():
 
 @app.route('/books', methods=['GET'])
 def api_get_books():
-    """提供前端載入書籍清單（純陣列版）"""
+    """載入書籍清單（附帶線上閱讀的檔案網址）"""
     try:
         response = supabase.table('books').select('*').execute()
         raw_data = response.data if response.data else []
         
         processed_data = []
         for book in raw_data:
+            book_id = book.get('id', 'unknown_id')
+            # 自動產生該檔案在 Supabase Storage 的公開讀取網址
+            file_url = supabase.storage.from_('epubs').get_public_url(f"{book_id}.epub")
+            
             processed_data.append({
-                "id": book.get('id', 'unknown_id'),
-                "title": book.get('title', book.get('id', '未命名書籍')),
+                "id": book_id,
+                "title": book.get('title', book_id),
                 "series_name": book.get('series_name', '預設分類'),
                 "uploader": book.get('uploader', '匿名訪客'),
-                "is_temporary": book.get('is_temporary', False)
+                "is_temporary": book.get('is_temporary', False),
+                "file_url": file_url  # 💡 傳給前端閱讀器使用的網址
             })
             
-        # 💡 關鍵變更：不包裝任何字典，直接回傳 List！
         return jsonify(processed_data), 200
-        
     except Exception as e:
-        print(f"❌ 讀取書籍時發生資料庫錯誤: {str(e)}")
-        # 即使出錯也回傳空陣列 []
+        print(f"❌ 讀取書籍錯誤: {str(e)}")
         return jsonify([]), 200
-
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
+    """處理 EPUB 上傳並存入 Supabase Storage"""
     if 'file' not in request.files:
         return jsonify({"status": "error", "message": "沒有選擇檔案"}), 400
         
     file = request.files['file']
-    if file.filename == '':
-        return jsonify({"status": "error", "message": "未選取任何檔案"}), 400
+    if file.filename == '' or not file.filename.lower().endswith('.epub'):
+        return jsonify({"status": "error", "message": "無效的檔案格式！"}), 400
         
-    if file and file.filename.lower().endswith('.epub'):
-        filename = secure_filename(file.filename)
-        book_id = os.path.splitext(filename)[0]
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(filepath)
+    filename = secure_filename(file.filename)
+    book_id = os.path.splitext(filename)[0]
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    file.save(filepath)
+    
+    try:
+        book = epub.read_epub(filepath)
+        title = book.get_metadata('DC', 'title')
+        title_str = title[0][0] if title else book_id
         
-        try:
-            book = epub.read_epub(filepath)
-            title = book.get_metadata('DC', 'title')
-            title_str = title[0][0] if title else book_id
-            
-            payload = {
-                "id": book_id,
-                "title": title_str
-            }
-            
-            supabase.table('books').insert(payload).execute()
-            return jsonify({"status": "success", "message": f"書籍《{title_str}》上傳成功！"}), 200
-        except Exception as e:
-            return jsonify({"status": "error", "message": f"資料庫寫入失敗: {str(e)}"}), 500
-        finally:
-            if os.path.exists(filepath):
-                os.remove(filepath)
-    else:
-        return jsonify({"status": "error", "message": "僅支援上傳 .epub 格式！"}), 400
-
+        # 💡 將 EPUB 實體檔案上傳到 Supabase Storage
+        with open(filepath, 'rb') as f:
+            try:
+                supabase.storage.from_('epubs').upload(
+                    path=f"{book_id}.epub",
+                    file=f,
+                    file_options={"content-type": "application/epub+zip"}
+                )
+            except Exception as storage_err:
+                print(f"⚠️ Storage 上傳警告 (可能檔案已存在): {str(storage_err)}")
+        
+        payload = {"id": book_id, "title": title_str}
+        supabase.table('books').insert(payload).execute()
+        
+        return jsonify({"status": "success", "message": f"書籍《{title_str}》上傳成功！"}), 200
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"處理失敗: {str(e)}"}), 500
+    finally:
+        if os.path.exists(filepath):
+            os.remove(filepath)
 
 @app.route('/delete/<book_id>', methods=['POST', 'DELETE'])
 def delete_book(book_id):
@@ -174,15 +173,48 @@ def delete_book(book_id):
     try:
         response = supabase.table('books').select('*').eq('id', book_id).execute()
         if not response.data:
-            return jsonify({"status": "error", "message": "找不到該書籍紀錄"}), 404
+            return jsonify({"status": "error", "message": "找不到該書籍"}), 404
             
         uploader = response.data[0].get('uploader', '匿名訪客')
         
         if session.get('is_admin') or session.get('user') == uploader or uploader == '匿名訪客':
+            # 💡 同步刪除 Storage 裡的實體檔案
+            supabase.storage.from_('epubs').remove([f"{book_id}.epub"])
+            # 刪除資料庫紀錄
             supabase.table('books').delete().eq('id', book_id).execute()
-            return jsonify({"status": "success", "message": "書籍已成功刪除"}), 200
-        else:
-            return jsonify({"status": "error", "message": "權限不足！您不是該書的上傳者。"}), 403
+            
+            return jsonify({"status": "success", "message": "書籍已刪除"}), 200
+        return jsonify({"status": "error", "message": "權限不足"}), 403
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+# --- 5. 新增功能：分類改名 API ---
+
+@app.route('/rename_category/<book_id>', methods=['POST', 'PUT'])
+def rename_category(book_id):
+    """更改特定書籍的分類名稱"""
+    if 'user' not in session:
+        return jsonify({"status": "error", "message": "請先登入！"}), 401
+        
+    data = request.get_json() if request.is_json else request.form
+    new_category = data.get('new_category', '').strip()
+    
+    if not new_category:
+        return jsonify({"status": "error", "message": "分類名稱不能為空"}), 400
+        
+    try:
+        response = supabase.table('books').select('uploader').eq('id', book_id).execute()
+        if not response.data:
+            return jsonify({"status": "error", "message": "找不到該書籍"}), 404
+            
+        uploader = response.data[0].get('uploader', '匿名訪客')
+        
+        # 只有管理員或上傳者本人可以改名
+        if session.get('is_admin') or session.get('user') == uploader or uploader == '匿名訪客':
+            supabase.table('books').update({"series_name": new_category}).eq('id', book_id).execute()
+            return jsonify({"status": "success", "message": "分類已成功更新！"}), 200
+        
+        return jsonify({"status": "error", "message": "權限不足！您不是該書的上傳者。"}), 403
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
