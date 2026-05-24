@@ -103,9 +103,12 @@ def delete_book(book_id):
     book_to_delete = next((b for b in books_db if b["id"] == book_id), None)
     
     if book_to_delete:
+        # 從資料庫陣列中移除
         books_db = [b for b in books_db if b["id"] != book_id]
         
+        # 嘗試從伺服器本機刪除實體檔案以釋放空間
         try:
+            # 移除開頭的斜線，將 /static/uploads/... 轉為相對路徑 static/uploads/...
             file_path = book_to_delete["file_url"].lstrip('/')
             if os.path.exists(file_path):
                 os.remove(file_path)
