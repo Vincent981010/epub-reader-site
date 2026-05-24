@@ -95,19 +95,26 @@ def api_user_status():
         }), 200
     return jsonify({"logged_in": False}), 200
 
-# --- 4. JSON API 接口：書籍資料處理 ---
+# --- 4. JSON API 接口：書籍資料處理 (隱私隔離版) ---
 
 @app.route('/books', methods=['GET'])
 def api_get_books():
-    """載入書籍清單（附帶線上閱讀的檔案網址）"""
+    """載入書籍清單：管理員看全部，一般用戶只看自己上傳的內容"""
     try:
-        response = supabase.table('books').select('*').execute()
+        current_user = session.get('user', '匿名訪客')
+        is_admin = session.get('is_admin', False)
+        
+        # 💡 隱私過濾邏輯
+        if is_admin:
+            response = supabase.table('books').select('*').execute()
+        else:
+            response = supabase.table('books').select('*').eq('uploader', current_user).execute()
+            
         raw_data = response.data if response.data else []
         
         processed_data = []
         for book in raw_data:
             book_id = book.get('id', 'unknown_id')
-            # 自動產生該檔案在 Supabase Storage 的公開讀取網址
             file_url = supabase.storage.from_('epubs').get_public_url(f"{book_id}.epub")
             
             processed_data.append({
@@ -116,7 +123,7 @@ def api_get_books():
                 "series_name": book.get('series_name', '預設分類'),
                 "uploader": book.get('uploader', '匿名訪客'),
                 "is_temporary": book.get('is_temporary', False),
-                "file_url": file_url  # 💡 傳給前端閱讀器使用的網址
+                "file_url": file_url
             })
             
         return jsonify(processed_data), 200
@@ -126,7 +133,6 @@ def api_get_books():
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
-    """處理 EPUB 上傳並存入 Supabase Storage"""
     if 'file' not in request.files:
         return jsonify({"status": "error", "message": "沒有選擇檔案"}), 400
         
@@ -144,7 +150,6 @@ def upload_file():
         title = book.get_metadata('DC', 'title')
         title_str = title[0][0] if title else book_id
         
-        # 💡 將 EPUB 實體檔案上傳到 Supabase Storage
         with open(filepath, 'rb') as f:
             try:
                 supabase.storage.from_('epubs').upload(
@@ -153,9 +158,10 @@ def upload_file():
                     file_options={"content-type": "application/epub+zip"}
                 )
             except Exception as storage_err:
-                print(f"⚠️ Storage 上傳警告 (可能檔案已存在): {str(storage_err)}")
+                print(f"⚠️ Storage 上傳警告: {str(storage_err)}")
         
-        payload = {"id": book_id, "title": title_str}
+        uploader = session.get('user', '匿名訪客')
+        payload = {"id": book_id, "title": title_str, "uploader": uploader}
         supabase.table('books').insert(payload).execute()
         
         return jsonify({"status": "success", "message": f"書籍《{title_str}》上傳成功！"}), 200
@@ -177,22 +183,16 @@ def delete_book(book_id):
             
         uploader = response.data[0].get('uploader', '匿名訪客')
         
-        if session.get('is_admin') or session.get('user') == uploader or uploader == '匿名訪客':
-            # 💡 同步刪除 Storage 裡的實體檔案
+        if session.get('is_admin') or session.get('user') == uploader:
             supabase.storage.from_('epubs').remove([f"{book_id}.epub"])
-            # 刪除資料庫紀錄
             supabase.table('books').delete().eq('id', book_id).execute()
-            
             return jsonify({"status": "success", "message": "書籍已刪除"}), 200
         return jsonify({"status": "error", "message": "權限不足"}), 403
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
-# --- 5. 新增功能：分類改名 API ---
-
 @app.route('/rename_category/<book_id>', methods=['POST', 'PUT'])
 def rename_category(book_id):
-    """更改特定書籍的分類名稱"""
     if 'user' not in session:
         return jsonify({"status": "error", "message": "請先登入！"}), 401
         
@@ -209,15 +209,13 @@ def rename_category(book_id):
             
         uploader = response.data[0].get('uploader', '匿名訪客')
         
-        # 只有管理員或上傳者本人可以改名
-        if session.get('is_admin') or session.get('user') == uploader or uploader == '匿名訪客':
+        if session.get('is_admin') or session.get('user') == uploader:
             supabase.table('books').update({"series_name": new_category}).eq('id', book_id).execute()
             return jsonify({"status": "success", "message": "分類已成功更新！"}), 200
         
-        return jsonify({"status": "error", "message": "權限不足！您不是該書的上傳者。"}), 403
+        return jsonify({"status": "error", "message": "權限不足"}), 403
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
-
 
 if __name__ == '__main__':
     app.run(debug=True)
