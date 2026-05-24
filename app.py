@@ -39,7 +39,6 @@ def index():
 
 @app.route('/register', methods=['POST'])
 def register():
-    """非同步註冊 API"""
     data = request.get_json() if request.is_json else request.form
     username = data.get('username', '').strip()
     password = data.get('password', '').strip()
@@ -65,7 +64,6 @@ def register():
 
 @app.route('/login', methods=['POST'])
 def login():
-    """非同步登入 API"""
     data = request.get_json() if request.is_json else request.form
     username = data.get('username', '').strip()
     password = data.get('password', '').strip()
@@ -90,14 +88,12 @@ def login():
 
 @app.route('/logout', methods=['POST', 'GET'])
 def logout():
-    """登出 API"""
     session.clear()
     return jsonify({"status": "success", "message": "您已成功登出"}), 200
 
 
 @app.route('/user/status', methods=['GET'])
 def api_user_status():
-    """提供前端檢查目前的登入狀態"""
     if 'user' in session:
         return jsonify({
             "logged_in": True,
@@ -106,11 +102,11 @@ def api_user_status():
         }), 200
     return jsonify({"logged_in": False}), 200
 
-# --- 4. JSON API 接口：書籍資料處理（格式全面包抄版） ---
+# --- 4. JSON API 接口：書籍資料處理 ---
 
 @app.route('/books', methods=['GET'])
 def api_get_books():
-    """提供前端載入書籍清單（全格式包抄，解決 undefined 欄位對不上問題）"""
+    """提供前端載入書籍清單（純陣列版）"""
     try:
         response = supabase.table('books').select('*').execute()
         raw_data = response.data if response.data else []
@@ -125,25 +121,17 @@ def api_get_books():
                 "is_temporary": book.get('is_temporary', False)
             })
             
-        # 💡 終極修復：不論前端 JavaScript 寫法是 data.data、data.books 還是直接把 data 當成陣列
-        # 我們直接把所有可能的欄位全部塞進 JSON 回傳，全面攔截 undefined 錯誤！
-        return jsonify({
-            "status": "success",
-            "success": True,
-            "data": processed_data,
-            "books": processed_data,
-            "list": processed_data
-        }), 200
+        # 💡 關鍵變更：不包裝任何字典，直接回傳 List！
+        return jsonify(processed_data), 200
         
     except Exception as e:
         print(f"❌ 讀取書籍時發生資料庫錯誤: {str(e)}")
-        # 即使出錯也回傳空陣列結構，確保網頁不會卡死轉圈圈
-        return jsonify({"status": "success", "success": True, "data": [], "books": [], "list": []}), 200
+        # 即使出錯也回傳空陣列 []
+        return jsonify([]), 200
 
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
-    """處理 EPUB 書籍上傳"""
     if 'file' not in request.files:
         return jsonify({"status": "error", "message": "沒有選擇檔案"}), 400
         
@@ -161,7 +149,6 @@ def upload_file():
             book = epub.read_epub(filepath)
             title = book.get_metadata('DC', 'title')
             title_str = title[0][0] if title else book_id
-            uploader = session.get('user', '匿名訪客')
             
             payload = {
                 "id": book_id,
@@ -181,7 +168,6 @@ def upload_file():
 
 @app.route('/delete/<book_id>', methods=['POST', 'DELETE'])
 def delete_book(book_id):
-    """刪除書籍"""
     if 'user' not in session:
         return jsonify({"status": "error", "message": "請先登入！"}), 401
         
@@ -201,6 +187,5 @@ def delete_book(book_id):
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
-# --- 5. 啟動進入點 ---
 if __name__ == '__main__':
     app.run(debug=True)
