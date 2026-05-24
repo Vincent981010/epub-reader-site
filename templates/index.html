@@ -1,392 +1,399 @@
-<!DOCTYPE html>
-<html lang="zh-TW">
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>智能雲端書庫</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        :root {
-            --primary-color: #3b82f6; --primary-hover: #2563eb;
-            --text-main: #1f2937; --text-muted: #6b7280;
-            --bg-body: #f3f4f6; --bg-panel: #ffffff; --border-color: #e5e7eb;
-        }
-        body { font-family: 'Segoe UI', sans-serif; margin: 0; background-color: var(--bg-body); color: var(--text-main); display: flex; flex-direction: column; min-height: 100vh; }
-        header { background-color: var(--bg-panel); padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-        .logo { font-size: 1.5rem; font-weight: 600; color: var(--primary-color); }
-        .user-panel { font-size: 0.95rem; font-weight: 500; }
-        .container { display: flex; flex: 1; max-width: 1400px; margin: 0 auto; width: 100%; padding: 20px; gap: 20px; box-sizing: border-box; }
-        .sidebar { width: 280px; background: var(--bg-panel); padding: 1.5rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); height: fit-content; }
-        .sidebar-section { margin-bottom: 2rem; }
-        .sidebar-section h3 { font-size: 1.1rem; margin-top: 0; margin-bottom: 1rem; border-bottom: 2px solid var(--border-color); padding-bottom: 0.5rem; }
-        .upload-zone { border: 2px dashed #cbd5e0; border-radius: 8px; padding: 2rem 1rem; text-align: center; cursor: pointer; transition: all 0.2s; background: #fafafa; margin-bottom: 1rem; }
-        .upload-zone:hover { border-color: var(--primary-color); background: #eff6ff; }
-        .upload-zone i { font-size: 2rem; color: var(--primary-color); margin-bottom: 0.5rem; }
-        .upload-zone p { margin: 0; font-size: 0.9rem; color: var(--text-muted); }
-        input[type="file"] { display: none; }
-        .upload-actions { display: flex; flex-direction: column; gap: 0.5rem; }
-        .btn { padding: 0.5rem 1rem; border-radius: 6px; border: none; cursor: pointer; font-size: 0.9rem; transition: background 0.2s; display: flex; align-items: center; justify-content: center; gap: 0.5rem; }
-        .btn-primary { background: var(--primary-color); color: white; }
-        .btn-primary:hover { background: var(--primary-hover); }
-        .btn-outline { background: transparent; border: 1px solid var(--border-color); color: var(--text-main); }
-        .btn-outline:hover { background: #f9fafb; border-color: #d1d5db; }
-        .category-list { list-style: none; padding: 0; margin: 0; }
-        .category-item { padding: 0.75rem 1rem; border-radius: 6px; cursor: pointer; margin-bottom: 0.25rem; transition: background 0.2s; color: var(--text-muted); }
-        .category-item:hover { background: #f3f4f6; color: var(--text-main); }
-        .category-item.active { background: #eff6ff; color: var(--primary-color); font-weight: 600; }
-        .main-content { flex: 1; background: var(--bg-panel); padding: 2rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-        .content-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; }
-        .content-header h2 { margin: 0; font-size: 1.5rem; }
-        .book-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 1.5rem; }
-        .book-card { background: #fff; border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem; text-align: center; transition: transform 0.2s, box-shadow 0.2s; cursor: pointer; }
-        .book-card:hover { transform: translateY(-3px); box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        .book-title { font-weight: 600; margin-bottom: 0.5rem; font-size: 1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .book-category { font-size: 0.8rem; color: var(--text-muted); background: #f3f4f6; padding: 0.2rem 0.5rem; border-radius: 4px; display: inline-block; }
-        #loading-overlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.8); z-index:9999; justify-content:center; align-items:center; font-size: 1.2rem; font-weight: bold; color: var(--primary-color); }
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
-        .modal-content { background: #fff; padding: 2rem; border-radius: 12px; width: 100%; max-width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
-        .modal-header { font-size: 1.25rem; font-weight: 600; margin-bottom: 1.5rem; text-align: center; }
-        .form-group { margin-bottom: 1rem; }
-        .form-group label { display: block; margin-bottom: 0.5rem; font-size: 0.9rem; font-weight: 500; }
-        .form-group input { width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 6px; box-sizing: border-box; }
-        .modal-footer { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.5rem; }
-        .toggle-auth { font-size: 0.85rem; color: var(--primary-color); cursor: pointer; text-align: center; margin-top: 1rem; text-decoration: underline; }
-        .toast-container { position: fixed; bottom: 2rem; right: 2rem; z-index: 1000; display: flex; flex-direction: column; gap: 0.5rem; }
-        .toast { background: #333; color: #fff; padding: 1rem 1.5rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); opacity: 0; animation: slideIn 0.3s forwards, fadeOut 0.3s 2.7s forwards; }
-        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-        @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
-    </style>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta http-equiv="Content-Style-Type" content="text/css">
+  <title></title>
+  <meta name="Generator" content="Cocoa HTML Writer">
+  <meta name="CocoaVersion" content="2685.3">
+  <style type="text/css">
+    body {background-color: #f0f1f4}
+    p.p1 {margin: 0.0px 0.0px 0.0px 0.0px; font: 18.0px 'PingFang TC Semibold'; color: #2f69f3; -webkit-text-stroke: #2f69f3; background-color: #ffffff}
+    p.p2 {margin: 0.0px 0.0px 0.0px 0.0px; font: 18.0px 'PingFang TC Semibold'; color: #2f69f3; -webkit-text-stroke: #2f69f3; background-color: #ffffff; min-height: 25.0px}
+    span.s1 {font: 18.0px 'PingFang TC'; font-kerning: none}
+  </style>
 </head>
 <body>
-    <div id="loading-overlay">處理中...請稍候</div>
-
-    <header>
-        <div class="logo"><i class="fa-solid fa-book-open-reader"></i> 智能雲端書庫</div>
-        <div class="user-panel" id="userPanel"><span>載入中...</span></div>
-    </header>
-
-    <div class="container">
-        <div class="sidebar">
-            <div class="sidebar-section">
-                <h3>書籍匯入</h3>
-                <div class="upload-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
-                    <i class="fa-solid fa-cloud-arrow-up"></i>
-                    <p>將 EPUB 拖曳至此<br>或點擊上傳</p>
-                </div>
-                <div class="upload-actions">
-                    <input type="file" id="fileInput" accept=".epub" multiple onchange="handleFileSelect(this.files)">
-                    <button class="btn btn-outline" onclick="document.getElementById('fileInput').click()">
-                        <i class="fa-solid fa-files"></i> 選擇多個檔案
-                    </button>
-                    <input type="file" id="folderInput" accept=".epub" webkitdirectory directory multiple onchange="handleFileSelect(this.files)">
-                    <button class="btn btn-outline" onclick="document.getElementById('folderInput').click()">
-                        <i class="fa-solid fa-folder-open"></i> 選擇整個資料夾
-                    </button>
-                </div>
-            </div>
-            
-            <div class="sidebar-section">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                    <h3 style="margin: 0; border: none; padding: 0;">分流群組</h3>
-                    <!-- 💡 復原：新增分類按鈕 -->
-                    <button class="btn btn-outline" style="padding: 0.2rem 0.5rem; font-size: 0.8rem;" onclick="showAddSeriesModal()">
-                        <i class="fa-solid fa-plus"></i> 新增
-                    </button>
-                </div>
-                <ul class="category-list" id="seriesList">
-                    <li class="category-item active">全部書籍</li>
-                </ul>
-            </div>
-        </div>
-
-        <div class="main-content">
-            <div class="content-header">
-                <h2 id="currentCategoryTitle">所有書籍</h2>
-                <span id="bookCount" style="color: var(--text-muted); font-size: 0.9rem;">共 0 本</span>
-            </div>
-            <div class="book-grid" id="bookGrid"></div>
-        </div>
-    </div>
-
-    <!-- 會員登入/註冊彈窗 -->
-    <div class="modal" id="authModal">
-        <div class="modal-content">
-            <div class="modal-header" id="modalTitle">會員登入</div>
-            <div class="form-group"><label>帳號</label><input type="text" id="authUser"></div>
-            <div class="form-group"><label>密碼</label><input type="password" id="authPass"></div>
-            <div class="modal-footer">
-                <button class="btn btn-outline" onclick="closeModal('authModal')">取消</button>
-                <button class="btn btn-primary" id="authSubmitBtn" onclick="handleAuthSubmit()">登入</button>
-            </div>
-            <div class="toggle-auth" id="toggleAuthText" onclick="toggleAuthMode()">還沒有帳號？立即註冊</div>
-        </div>
-    </div>
-
-    <!-- 💡 復原：新增/修改分類彈窗 -->
-    <div class="modal" id="seriesModal">
-        <div class="modal-content">
-            <div class="modal-header">管理分類</div>
-            <div class="form-group">
-                <label>分類名稱</label>
-                <input type="text" id="newSeriesName" placeholder="輸入要建立的分類名稱">
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-outline" onclick="closeModal('seriesModal')">取消</button>
-                <button class="btn btn-primary" onclick="submitCreateSeries()">確認</button>
-            </div>
-        </div>
-    </div>
-
-    <div class="toast-container" id="toastContainer"></div>
-
-    <script>
-        let currentBooks = [];
-        let userInfo = { logged_in: false, username: '', is_admin: false };
-        let isRegisterMode = false;
-
-        window.addEventListener('DOMContentLoaded', () => {
-            checkUserStatus();
-            loadBooks();
-            setupDragAndDrop();
-        });
-
-        // 💡 優化：加入 try-catch 與 finally 保證面板必定渲染，不再卡死
-        async function checkUserStatus() {
-            try {
-                const res = await fetch('/user/status');
-                if (res.ok) {
-                    userInfo = await res.json();
-                } else {
-                    userInfo = { logged_in: false, username: '', is_admin: false };
-                }
-            } catch (e) { 
-                console.warn("未偵測到登入狀態");
-                userInfo = { logged_in: false, username: '', is_admin: false };
-            } finally {
-                renderUserPanel();
-            }
-        }
-
-        function renderUserPanel() {
-            const panel = document.getElementById('userPanel');
-            if (userInfo.logged_in) {
-                panel.innerHTML = `
-                    <span style="margin-right: 15px;"><i class="fa-solid fa-user"></i> ${userInfo.username}</span>
-                    <button class="btn btn-outline" style="padding: 0.3rem 0.8rem;" onclick="submitLogout()">登出</button>
-                `;
-            } else {
-                panel.innerHTML = `<button class="btn btn-primary" onclick="openAuthModal()">會員登入/註冊</button>`;
-            }
-        }
-
-        function openAuthModal() {
-            isRegisterMode = false;
-            document.getElementById('modalTitle').innerText = "會員登入";
-            document.getElementById('authSubmitBtn').innerText = "登入";
-            document.getElementById('toggleAuthText').innerText = "還沒有帳號？立即註冊";
-            document.getElementById('authUser').value = "";
-            document.getElementById('authPass').value = "";
-            showModal('authModal');
-        }
-
-        function toggleAuthMode() {
-            isRegisterMode = !isRegisterMode;
-            if (isRegisterMode) {
-                document.getElementById('modalTitle').innerText = "註冊新帳號";
-                document.getElementById('authSubmitBtn').innerText = "註冊";
-                document.getElementById('toggleAuthText').innerText = "已有帳號？前往登入";
-            } else {
-                document.getElementById('modalTitle').innerText = "會員登入";
-                document.getElementById('authSubmitBtn').innerText = "登入";
-                document.getElementById('toggleAuthText').innerText = "還沒有帳號？立即註冊";
-            }
-        }
-
-        async function handleAuthSubmit() {
-            const overlay = document.getElementById('loading-overlay');
-            const username = document.getElementById('authUser').value.trim();
-            const password = document.getElementById('authPass').value.trim();
-
-            if (!username || !password) { alert("請填寫帳號與密碼！"); return; }
-            overlay.style.display = 'flex'; 
-            
-            try {
-                const endpoint = isRegisterMode ? '/register' : '/login';
-                const res = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password })
-                });
-                
-                if (isRegisterMode) {
-                    const result = await res.json();
-                    if (res.ok) {
-                        showToast("🟢 註冊成功！請直接登入");
-                        toggleAuthMode();
-                    } else alert("註冊失敗: " + (result.error || "發生錯誤"));
-                } else {
-                    if (res.ok) {
-                        closeModal('authModal');
-                        showToast("🟢 登入成功！歡迎回來");
-                        await checkUserStatus();
-                        await loadBooks(); 
-                    } else alert("登入失敗，請檢查您的帳號密碼是否正確！");
-                }
-            } catch (e) {
-                console.error(e);
-                alert("伺服器連線異常");
-            } finally {
-                overlay.style.display = 'none'; 
-            }
-        }
-
-        async function submitLogout() {
-            await fetch('/logout', { method: 'POST' });
-            showToast("🔒 已安全登出");
-            userInfo = { logged_in: false, username: '', is_admin: false };
-            renderUserPanel();
-            loadBooks(); 
-        }
-
-        // 💡 復原：新增分類控制腳本
-        function showAddSeriesModal() {
-            if (!userInfo.logged_in) {
-                alert("請先登入才能管理分類！");
-                return;
-            }
-            document.getElementById('newSeriesName').value = '';
-            showModal('seriesModal');
-        }
-
-        async function submitCreateSeries() {
-            const name = document.getElementById('newSeriesName').value.trim();
-            if (!name) return;
-            try {
-                const res = await fetch('/series', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ name: name })
-                });
-                if (res.ok) {
-                    closeModal('seriesModal');
-                    showToast("✅ 分類處理成功");
-                    loadBooks();
-                } else {
-                    alert("分類操作失敗");
-                }
-            } catch(e) { console.error(e); }
-        }
-
-        async function loadBooks() {
-            try {
-                const res = await fetch('/books');
-                if (res.ok) {
-                    currentBooks = await res.json();
-                    renderBookGrid(currentBooks);
-                    updateSeriesList();
-                }
-            } catch (e) { console.error("載入書籍失敗:", e); }
-        }
-
-        function renderBookGrid(books) {
-            const grid = document.getElementById('bookGrid');
-            document.getElementById('bookCount').innerText = `共 ${books.length} 本`;
-            if (books.length === 0) {
-                grid.innerHTML = `<div style="grid-column: 1/-1; text-align:center; color: #666; padding: 2rem;">目前沒有書籍資料</div>`;
-                return;
-            }
-            grid.innerHTML = books.map(b => `
-                <div class="book-card">
-                    <div class="book-title" title="${b.title}">${b.title.replace('.epub', '')}</div>
-                    <div class="book-category">${b.series_name || '預設分類'}</div>
-                </div>
-            `).join('');
-        }
-
-        function updateSeriesList() {
-            const list = document.getElementById('seriesList');
-            const categories = ['全部書籍', ...new Set(currentBooks.map(b => b.series_name || '預設分類'))];
-            list.innerHTML = categories.map((cat, idx) => `
-                <li class="category-item ${idx === 0 ? 'active' : ''}" onclick="filterCategory(this, '${cat}')">${cat}</li>
-            `).join('');
-        }
-
-        function filterCategory(element, category) {
-            document.querySelectorAll('.category-item').forEach(el => el.classList.remove('active'));
-            element.classList.add('active');
-            document.getElementById('currentCategoryTitle').innerText = category;
-            
-            if (category === '全部書籍') renderBookGrid(currentBooks);
-            else {
-                const filtered = currentBooks.filter(b => (b.series_name || '預設分類') === category);
-                renderBookGrid(filtered);
-            }
-        }
-
-        async function handleFileSelect(fileList) {
-            if (fileList.length === 0) return;
-            if (!userInfo.logged_in) {
-                alert("請先登入後再進行上傳！");
-                openAuthModal();
-                return;
-            }
-
-            const overlay = document.getElementById('loading-overlay');
-            overlay.style.display = 'flex'; 
-            
-            try {
-                const formData = new FormData();
-                let validCount = 0;
-                for (let i = 0; i < fileList.length; i++) {
-                    if (fileList[i].name.endsWith('.epub') || fileList[i].type === "application/epub+zip") {
-                        formData.append('file', fileList[i]);
-                        validCount++;
-                    }
-                }
-                if (validCount === 0) { alert("請選擇有效的 EPUB 檔案。"); return; }
-                const response = await fetch('/upload', { method: 'POST', body: formData });
-                const result = await response.json();
-                if (response.ok) {
-                    showToast(`🎉 成功上傳書籍！`);
-                    loadBooks();
-                } else alert("上傳失敗: " + (result.error || "未知錯誤"));
-            } catch (e) {
-                console.error(e);
-                alert("上傳過程發生異常");
-            } finally {
-                overlay.style.display = 'none'; 
-                document.getElementById('fileInput').value = '';
-                document.getElementById('folderInput').value = '';
-            }
-        }
-
-        function setupDragAndDrop() {
-            const dropZone = document.getElementById('dropZone');
-            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => {
-                dropZone.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); }, false);
-            });
-            dropZone.addEventListener('dragover', () => dropZone.style.borderColor = "var(--primary-color)");
-            dropZone.addEventListener('dragleave', () => dropZone.style.borderColor = "#cbd5e0");
-            dropZone.addEventListener('drop', e => {
-                dropZone.style.borderColor = "#cbd5e0";
-                handleFileSelect(e.dataTransfer.files);
-            });
-        }
-
-        function showModal(id) { document.getElementById(id).style.display = 'flex'; }
-        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-        
-        document.getElementById('authModal').addEventListener('click', function(e) { if(e.target === this) closeModal('authModal'); });
-        document.getElementById('seriesModal').addEventListener('click', function(e) { if(e.target === this) closeModal('seriesModal'); });
-
-        function showToast(text) {
-            const container = document.getElementById('toastContainer');
-            const toast = document.createElement('div');
-            toast.className = 'toast';
-            toast.innerHTML = text;
-            container.appendChild(toast);
-            setTimeout(() => toast.remove(), 3000);
-        }
-    </script>
+<p class="p1"><span class="s1"><b>&lt;!DOCTYPE html&gt;</b></span></p>
+<p class="p1"><span class="s1"><b>&lt;html lang="zh-TW"&gt;</b></span></p>
+<p class="p1"><span class="s1"><b>&lt;head&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">    </span>&lt;meta charset="UTF-8"&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">    </span>&lt;meta name="viewport" content="width=device-width, initial-scale=1.0"&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">    </span>&lt;title&gt;智能雲端書庫&lt;/title&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">    </span>&lt;link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">    </span>&lt;!-- 引入 EPUB.js 核心 --&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">    </span>&lt;script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js"&gt;&lt;/script&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">    </span>&lt;script src="https://cdnjs.cloudflare.com/ajax/libs/epub.js/0.3.88/epub.min.js"&gt;&lt;/script&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">    </span>&lt;style&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>:root { --primary-color: #3b82f6; --primary-hover: #2563eb; --text-main: #1f2937; --text-muted: #6b7280; --bg-body: #f3f4f6; --bg-panel: #ffffff; --border-color: #e5e7eb; }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>body { font-family: 'Segoe UI', sans-serif; margin: 0; background-color: var(--bg-body); color: var(--text-main); display: flex; flex-direction: column; min-height: 100vh; }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>header { background-color: var(--bg-panel); padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); box-shadow: 0 1px 3px rgba(0,0,0,0.05); }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>.logo { font-size: 1.5rem; font-weight: 600; color: var(--primary-color); }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>.container { display: flex; flex: 1; max-width: 1400px; margin: 0 auto; width: 100%; padding: 20px; gap: 20px; box-sizing: border-box; }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>.sidebar { width: 280px; background: var(--bg-panel); padding: 1.5rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); height: fit-content; }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>.sidebar-section { margin-bottom: 2rem; }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>.sidebar-section h3 { font-size: 1.1rem; margin-top: 0; margin-bottom: 1rem; border-bottom: 2px solid var(--border-color); padding-bottom: 0.5rem; }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>.upload-zone { border: 2px dashed #cbd5e0; border-radius: 8px; padding: 2rem 1rem; text-align: center; cursor: pointer; transition: all 0.2s; background: #fafafa; margin-bottom: 1rem; }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>.upload-zone:hover { border-color: var(--primary-color); background: #eff6ff; }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>.upload-zone i { font-size: 2rem; color: var(--primary-color); margin-bottom: 0.5rem; }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>input[type="file"] { display: none; }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>.upload-actions { display: flex; flex-direction: column; gap: 0.5rem; }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>.btn { padding: 0.5rem 1rem; border-radius: 6px; border: none; cursor: pointer; font-size: 0.9rem; transition: background 0.2s; display: flex; align-items: center; justify-content: center; gap: 0.5rem; }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>.btn-primary { background: var(--primary-color); color: white; }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>.btn-primary:hover { background: var(--primary-hover); }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>.btn-outline { background: transparent; border: 1px solid var(--border-color); color: var(--text-main); }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>.btn-outline:hover { background: #f9fafb; }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>.category-list { list-style: none; padding: 0; margin: 0; }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>.category-item { padding: 0.75rem 1rem; border-radius: 6px; cursor: pointer; margin-bottom: 0.25rem; transition: background 0.2s; color: var(--text-muted); }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>.category-item:hover { background: #f3f4f6; color: var(--text-main); }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>.category-item.active { background: #eff6ff; color: var(--primary-color); font-weight: 600; }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>.main-content { flex: 1; background: var(--bg-panel); padding: 2rem; border-radius: 8px; }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>.content-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>.content-header h2 { margin: 0; font-size: 1.5rem; }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>.book-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 1.5rem; }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>.book-card { background: #fff; border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem; text-align: center; transition: transform 0.2s; cursor: pointer; position: relative; }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>.book-card:hover { transform: translateY(-3px); box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-color: var(--primary-color); }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>.book-settings-btn { position: absolute; top: 8px; right: 8px; color: #9ca3af; padding: 5px; }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>.book-settings-btn:hover { color: var(--primary-color); }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>.book-title { font-weight: 600; margin: 1.5rem 0 0.5rem 0; font-size: 1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>.book-category { font-size: 0.8rem; color: var(--text-muted); background: #f3f4f6; padding: 0.2rem 0.5rem; border-radius: 4px; display: inline-block; }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>#loading-overlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.8); z-index:9999; justify-content:center; align-items:center; font-size: 1.2rem; font-weight: bold; color: var(--primary-color); }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>.modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center; }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>.modal-content { background: #fff; padding: 2rem; border-radius: 12px; width: 100%; max-width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>.modal-header { font-size: 1.25rem; font-weight: 600; margin-bottom: 1.5rem; text-align: center; }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>.form-group { margin-bottom: 1rem; }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>.form-group label { display: block; margin-bottom: 0.5rem; font-size: 0.9rem; font-weight: 500; }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>.form-group input { width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 6px; box-sizing: border-box; }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>.modal-footer { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.5rem; }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>.toast-container { position: fixed; bottom: 2rem; right: 2rem; z-index: 1000; display: flex; flex-direction: column; gap: 0.5rem; }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>.toast { background: #333; color: #fff; padding: 1rem 1.5rem; border-radius: 8px; opacity: 0; animation: slideIn 0.3s forwards, fadeOut 0.3s 2.7s forwards; }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>@keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }</b></span></p>
+<p class="p2"><span class="s1"><b></b></span><br></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>/* 閱讀器專屬樣式 */</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>#readerModal .modal-content { max-width: 900px; height: 85vh; display: flex; flex-direction: column; padding: 1rem; }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>#viewer { flex: 1; border: 1px solid #e5e7eb; border-radius: 8px; margin: 10px 0; background: #fafafa; overflow: hidden; position: relative; }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>.reader-controls { display: flex; justify-content: center; gap: 1rem; }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">    </span>&lt;/style&gt;</b></span></p>
+<p class="p1"><span class="s1"><b>&lt;/head&gt;</b></span></p>
+<p class="p1"><span class="s1"><b>&lt;body&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">    </span>&lt;div id="loading-overlay"&gt;處理中...&lt;/div&gt;</b></span></p>
+<p class="p2"><span class="s1"><b></b></span><br></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">    </span>&lt;header&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>&lt;div class="logo"&gt;&lt;i class="fa-solid fa-book-open-reader"&gt;&lt;/i&gt; 智能雲端書庫&lt;/div&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>&lt;div class="user-panel" id="userPanel"&gt;&lt;span&gt;載入中...&lt;/span&gt;&lt;/div&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">    </span>&lt;/header&gt;</b></span></p>
+<p class="p2"><span class="s1"><b></b></span><br></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">    </span>&lt;div class="container"&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>&lt;div class="sidebar"&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>&lt;div class="sidebar-section"&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>&lt;h3&gt;書籍匯入&lt;/h3&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>&lt;div class="upload-zone" id="dropZone" onclick="document.getElementById('fileInput').click()"&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                    </span>&lt;i class="fa-solid fa-cloud-arrow-up"&gt;&lt;/i&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                    </span>&lt;p&gt;將 EPUB 拖曳至此&lt;br&gt;或點擊上傳&lt;/p&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>&lt;/div&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>&lt;div class="upload-actions"&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                    </span>&lt;input type="file" id="fileInput" accept=".epub" multiple onchange="handleFileSelect(this.files)"&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                    </span>&lt;button class="btn btn-outline" onclick="document.getElementById('fileInput').click()"&gt;&lt;i class="fa-solid fa-files"&gt;&lt;/i&gt; 選擇檔案&lt;/button&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>&lt;/div&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>&lt;/div&gt;</b></span></p>
+<p class="p2"><span class="s1"><b><span class="Apple-converted-space">            </span></b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>&lt;div class="sidebar-section"&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>&lt;div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;"&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                    </span>&lt;h3 style="margin: 0; border: none; padding: 0;"&gt;分流群組&lt;/h3&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                    </span>&lt;!-- 💡 新增：修改分類名稱按鈕 --&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                    </span>&lt;button class="btn btn-outline" style="padding: 0.2rem 0.5rem; font-size: 0.8rem;" onclick="openEditSeriesModal()"&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                        </span>&lt;i class="fa-solid fa-pen"&gt;&lt;/i&gt; 修改</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                    </span>&lt;/button&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>&lt;/div&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>&lt;ul class="category-list" id="seriesList"&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                    </span>&lt;li class="category-item active"&gt;全部書籍&lt;/li&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>&lt;/ul&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>&lt;/div&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>&lt;/div&gt;</b></span></p>
+<p class="p2"><span class="s1"><b></b></span><br></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>&lt;div class="main-content"&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>&lt;div class="content-header"&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>&lt;h2 id="currentCategoryTitle"&gt;全部書籍&lt;/h2&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>&lt;span id="bookCount" style="color: var(--text-muted); font-size: 0.9rem;"&gt;共 0 本&lt;/span&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>&lt;/div&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>&lt;div class="book-grid" id="bookGrid"&gt;&lt;/div&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>&lt;/div&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">    </span>&lt;/div&gt;</b></span></p>
+<p class="p2"><span class="s1"><b></b></span><br></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">    </span>&lt;!-- 📚 閱讀器彈窗 --&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">    </span>&lt;div class="modal" id="readerModal"&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>&lt;div class="modal-content"&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>&lt;div class="modal-header" style="display:flex; justify-content:space-between; margin-bottom:0;"&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>&lt;span id="readerTitle" style="font-size:1.1rem;"&gt;載入中...&lt;/span&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>&lt;button class="btn btn-outline" style="padding: 0.2rem 0.5rem;" onclick="closeReader()"&gt;&lt;i class="fa-solid fa-xmark"&gt;&lt;/i&gt; 關閉&lt;/button&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>&lt;/div&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>&lt;div id="viewer"&gt;&lt;/div&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>&lt;div class="reader-controls"&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>&lt;button class="btn btn-primary" onclick="if(rendition) rendition.prev()"&gt;&lt;i class="fa-solid fa-arrow-left"&gt;&lt;/i&gt; 上一頁&lt;/button&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>&lt;button class="btn btn-primary" onclick="if(rendition) rendition.next()"&gt;下一頁 &lt;i class="fa-solid fa-arrow-right"&gt;&lt;/i&gt;&lt;/button&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>&lt;/div&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>&lt;/div&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">    </span>&lt;/div&gt;</b></span></p>
+<p class="p2"><span class="s1"><b></b></span><br></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">    </span>&lt;!-- 修改分類名稱彈窗 --&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">    </span>&lt;div class="modal" id="editSeriesModal"&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>&lt;div class="modal-content"&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>&lt;div class="modal-header"&gt;修改分類名稱&lt;/div&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>&lt;p style="font-size:0.9rem; color:#666;"&gt;將會把目前分類中的所有書籍，轉移到新名稱之下。&lt;/p&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>&lt;input type="hidden" id="oldSeriesName"&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>&lt;div class="form-group"&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>&lt;label&gt;新分類名稱&lt;/label&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>&lt;input type="text" id="newSeriesName" placeholder="輸入新的名稱"&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>&lt;/div&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>&lt;div class="modal-footer"&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>&lt;button class="btn btn-outline" onclick="closeModal('editSeriesModal')"&gt;取消&lt;/button&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>&lt;button class="btn btn-primary" onclick="submitEditSeries()"&gt;確認修改&lt;/button&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>&lt;/div&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>&lt;/div&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">    </span>&lt;/div&gt;</b></span></p>
+<p class="p2"><span class="s1"><b></b></span><br></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">    </span>&lt;!-- 設定單一書籍分類彈窗 --&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">    </span>&lt;div class="modal" id="bookSettingsModal"&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>&lt;div class="modal-content"&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>&lt;div class="modal-header"&gt;書籍分類設定&lt;/div&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>&lt;input type="hidden" id="settingBookId"&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>&lt;div class="form-group"&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>&lt;label&gt;為此書指定新分類&lt;/label&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>&lt;input type="text" id="settingBookCategory" placeholder="例如：科幻小說、學習資料"&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>&lt;/div&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>&lt;div class="modal-footer"&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>&lt;button class="btn btn-outline" onclick="closeModal('bookSettingsModal')"&gt;取消&lt;/button&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>&lt;button class="btn btn-primary" onclick="submitBookCategory()"&gt;確認儲存&lt;/button&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>&lt;/div&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>&lt;/div&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">    </span>&lt;/div&gt;</b></span></p>
+<p class="p2"><span class="s1"><b></b></span><br></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">    </span>&lt;!-- 會員彈窗 (簡化保留) --&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">    </span>&lt;div class="modal" id="authModal"&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>&lt;div class="modal-content"&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>&lt;div class="modal-header" id="modalTitle"&gt;會員登入&lt;/div&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>&lt;div class="form-group"&gt;&lt;label&gt;帳號&lt;/label&gt;&lt;input type="text" id="authUser"&gt;&lt;/div&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>&lt;div class="form-group"&gt;&lt;label&gt;密碼&lt;/label&gt;&lt;input type="password" id="authPass"&gt;&lt;/div&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>&lt;div class="modal-footer"&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>&lt;button class="btn btn-outline" onclick="closeModal('authModal')"&gt;取消&lt;/button&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>&lt;button class="btn btn-primary" onclick="handleAuthSubmit()"&gt;送出&lt;/button&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>&lt;/div&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>&lt;div style="text-align:center; margin-top:1rem; cursor:pointer; color:var(--primary-color);" onclick="toggleAuthMode()" id="toggleAuthText"&gt;還沒有帳號？立即註冊&lt;/div&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>&lt;/div&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">    </span>&lt;/div&gt;</b></span></p>
+<p class="p2"><span class="s1"><b></b></span><br></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">    </span>&lt;div class="toast-container" id="toastContainer"&gt;&lt;/div&gt;</b></span></p>
+<p class="p2"><span class="s1"><b></b></span><br></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">    </span>&lt;script&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>let currentBooks = [];</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>let userInfo = { logged_in: false, username: '' };</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>let isRegisterMode = false;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>let activeCategory = '全部書籍';</b></span></p>
+<p class="p2"><span class="s1"><b><span class="Apple-converted-space">        </span></b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>// 閱讀器變數</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>let ePubBook = null;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>let rendition = null;</b></span></p>
+<p class="p2"><span class="s1"><b></b></span><br></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>window.addEventListener('DOMContentLoaded', () =&gt; {</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>checkUserStatus();</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>loadBooks();</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>setupDragAndDrop();</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>});</b></span></p>
+<p class="p2"><span class="s1"><b></b></span><br></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>async function checkUserStatus() {</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>try {</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>const res = await fetch('/user/status');</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>if (res.ok) userInfo = await res.json();</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>} catch (e) { console.warn(e); }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>finally { renderUserPanel(); }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>}</b></span></p>
+<p class="p2"><span class="s1"><b></b></span><br></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>function renderUserPanel() {</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>const panel = document.getElementById('userPanel');</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>if (userInfo.logged_in) {</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>panel.innerHTML = `&lt;span style="margin-right: 15px;"&gt;${userInfo.username}&lt;/span&gt;&lt;button class="btn btn-outline" onclick="submitLogout()"&gt;登出&lt;/button&gt;`;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>} else {</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>panel.innerHTML = `&lt;button class="btn btn-primary" onclick="showModal('authModal')"&gt;登入/註冊&lt;/button&gt;`;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>}</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>}</b></span></p>
+<p class="p2"><span class="s1"><b></b></span><br></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>// --- 📖 閱讀器邏輯 ---</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>function openReader(fileUrl, title) {</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>if(!fileUrl || fileUrl === "null") {</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>alert("此書籍沒有實體檔案，請重新上傳！");</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>return;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>}</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>document.getElementById('readerTitle').innerText = title.replace('.epub', '');</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>showModal('readerModal');</b></span></p>
+<p class="p2"><span class="s1"><b><span class="Apple-converted-space">            </span></b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>document.getElementById('viewer').innerHTML = ""; // 清空舊內容</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>ePubBook = ePub(fileUrl);</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>rendition = ePubBook.renderTo("viewer", {</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>width: "100%",</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>height: "100%",</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>spread: "none"</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>});</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>rendition.display();</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>}</b></span></p>
+<p class="p2"><span class="s1"><b></b></span><br></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>function closeReader() {</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>if(ePubBook) { ePubBook.destroy(); }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>closeModal('readerModal');</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>}</b></span></p>
+<p class="p2"><span class="s1"><b></b></span><br></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>// --- ✏️ 分類修改邏輯 ---</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>function openEditSeriesModal() {</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>if(activeCategory === '全部書籍' || activeCategory === '未分類') {</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>alert('「全部書籍」與「未分類」是系統預設，無法修改名稱。請點擊單一書籍右上角的齒輪來設定新分類。');</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>return;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>}</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>document.getElementById('oldSeriesName').value = activeCategory;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>document.getElementById('newSeriesName').value = activeCategory;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>showModal('editSeriesModal');</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>}</b></span></p>
+<p class="p2"><span class="s1"><b></b></span><br></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>async function submitEditSeries() {</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>const oldName = document.getElementById('oldSeriesName').value;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>const newName = document.getElementById('newSeriesName').value.trim();</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>if(!newName || oldName === newName) return;</b></span></p>
+<p class="p2"><span class="s1"><b></b></span><br></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>const res = await fetch('/series/update', {</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>method: 'POST',</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>headers: {'Content-Type': 'application/json'},</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>body: JSON.stringify({ old_name: oldName, new_name: newName })</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>});</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>if(res.ok) {</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>closeModal('editSeriesModal');</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>showToast("✅ 分類名稱修改成功");</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>activeCategory = newName; // 更新目前所在分類</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>loadBooks();</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>}</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>}</b></span></p>
+<p class="p2"><span class="s1"><b></b></span><br></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>// --- ⚙️ 單一書籍設定邏輯 ---</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>function openBookSettings(event, bookId, currentCategory) {</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>event.stopPropagation(); // 防止觸發打開閱讀器</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>document.getElementById('settingBookId').value = bookId;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>document.getElementById('settingBookCategory').value = currentCategory === '未分類' ? '' : currentCategory;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>showModal('bookSettingsModal');</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>}</b></span></p>
+<p class="p2"><span class="s1"><b></b></span><br></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>async function submitBookCategory() {</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>const bookId = document.getElementById('settingBookId').value;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>let newCat = document.getElementById('settingBookCategory').value.trim();</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>if(!newCat) newCat = '未分類';</b></span></p>
+<p class="p2"><span class="s1"><b></b></span><br></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>const res = await fetch('/books/update_category', {</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>method: 'POST',</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>headers: {'Content-Type': 'application/json'},</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>body: JSON.stringify({ book_id: bookId, new_category: newCat })</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>});</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>if(res.ok) {</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>closeModal('bookSettingsModal');</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>showToast("✅ 書籍分類已更新");</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>loadBooks();</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>}</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>}</b></span></p>
+<p class="p2"><span class="s1"><b></b></span><br></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>// --- 載入與渲染 ---</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>async function loadBooks() {</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>try {</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>const res = await fetch('/books');</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>if (res.ok) {</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                    </span>currentBooks = await res.json();</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                    </span>updateSeriesList();</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                    </span>renderBookGrid(activeCategory); // 保持在當前分類</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>}</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>} catch (e) { console.error(e); }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>}</b></span></p>
+<p class="p2"><span class="s1"><b></b></span><br></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>function updateSeriesList() {</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>const list = document.getElementById('seriesList');</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>const categories = ['全部書籍', ...new Set(currentBooks.map(b =&gt; b.series_name || '未分類'))];</b></span></p>
+<p class="p2"><span class="s1"><b><span class="Apple-converted-space">            </span></b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>// 如果原本的分類被刪空了，退回全部書籍</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>if(!categories.includes(activeCategory)) activeCategory = '全部書籍';</b></span></p>
+<p class="p2"><span class="s1"><b></b></span><br></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>list.innerHTML = categories.map(cat =&gt; `</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>&lt;li class="category-item ${cat === activeCategory ? 'active' : ''}" onclick="filterCategory(this, '${cat}')"&gt;${cat}&lt;/li&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>`).join('');</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>document.getElementById('currentCategoryTitle').innerText = activeCategory;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>}</b></span></p>
+<p class="p2"><span class="s1"><b></b></span><br></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>function filterCategory(element, category) {</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>activeCategory = category;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>document.querySelectorAll('.category-item').forEach(el =&gt; el.classList.remove('active'));</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>element.classList.add('active');</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>document.getElementById('currentCategoryTitle').innerText = category;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>renderBookGrid(category);</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>}</b></span></p>
+<p class="p2"><span class="s1"><b></b></span><br></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>function renderBookGrid(category) {</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>const grid = document.getElementById('bookGrid');</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>let filtered = category === '全部書籍' ? currentBooks : currentBooks.filter(b =&gt; (b.series_name || '未分類') === category);</b></span></p>
+<p class="p2"><span class="s1"><b><span class="Apple-converted-space">            </span></b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>document.getElementById('bookCount').innerText = `共 ${filtered.length} 本`;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>if (filtered.length === 0) {</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>grid.innerHTML = `&lt;div style="grid-column: 1/-1; text-align:center; color: #666; padding: 2rem;"&gt;目前沒有書籍資料&lt;/div&gt;`;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>return;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>}</b></span></p>
+<p class="p2"><span class="s1"><b><span class="Apple-converted-space">            </span></b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>// 點擊卡片閱讀，點擊齒輪設定分類</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>grid.innerHTML = filtered.map(b =&gt; `</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>&lt;div class="book-card" onclick="openReader('${b.file_url}', '${b.title}')"&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                    </span>&lt;i class="fa-solid fa-gear book-settings-btn" title="設定分類" onclick="openBookSettings(event, '${b.id}', '${b.series_name || '未分類'}')"&gt;&lt;/i&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                    </span>&lt;div class="book-title" title="${b.title}"&gt;${b.title.replace('.epub', '')}&lt;/div&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                    </span>&lt;div class="book-category"&gt;${b.series_name || '未分類'}&lt;/div&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>&lt;/div&gt;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>`).join('');</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>}</b></span></p>
+<p class="p2"><span class="s1"><b></b></span><br></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>// --- 系統共用邏輯 (上傳、登入等) ---</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>async function handleFileSelect(files) {</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>if (!userInfo.logged_in) { alert("請先登入"); return; }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>if (files.length === 0) return;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>document.getElementById('loading-overlay').style.display = 'flex';</b></span></p>
+<p class="p2"><span class="s1"><b><span class="Apple-converted-space">            </span></b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>try {</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>const formData = new FormData();</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>for (let f of files) { if (f.name.endsWith('.epub')) formData.append('file', f); }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>const res = await fetch('/upload', { method: 'POST', body: formData });</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>if(res.ok) { showToast("🎉 上傳成功！"); loadBooks(); }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>} finally {</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>document.getElementById('loading-overlay').style.display = 'none';</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>document.getElementById('fileInput').value = '';</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>}</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>}</b></span></p>
+<p class="p2"><span class="s1"><b><span class="Apple-converted-space">        </span></b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>function toggleAuthMode() {</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>isRegisterMode = !isRegisterMode;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>document.getElementById('modalTitle').innerText = isRegisterMode ? "註冊新帳號" : "會員登入";</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>document.getElementById('toggleAuthText').innerText = isRegisterMode ? "已有帳號？前往登入" : "還沒有帳號？立即註冊";</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>}</b></span></p>
+<p class="p2"><span class="s1"><b></b></span><br></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>async function handleAuthSubmit() {</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>const u = document.getElementById('authUser').value, p = document.getElementById('authPass').value;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>if(!u || !p) return;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>const res = await fetch(isRegisterMode ? '/register' : '/login', {</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({username: u, password: p})</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>});</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>if(res.ok) {</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>if(isRegisterMode) { showToast("註冊成功請登入"); toggleAuthMode(); }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">                </span>else { closeModal('authModal'); checkUserStatus(); loadBooks(); }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>} else alert("操作失敗");</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>}</b></span></p>
+<p class="p2"><span class="s1"><b><span class="Apple-converted-space">        </span></b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>async function submitLogout() { await fetch('/logout', {method: 'POST'}); checkUserStatus(); currentBooks=[]; renderBookGrid('全部書籍'); }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>function setupDragAndDrop() { /* 拖曳邏輯保留 */ }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>function showModal(id) { document.getElementById(id).style.display = 'flex'; }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>function closeModal(id) { document.getElementById(id).style.display = 'none'; }</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>function showToast(text) {</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>const toast = document.createElement('div'); toast.className = 'toast'; toast.innerHTML = text;</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">            </span>document.getElementById('toastContainer').appendChild(toast); setTimeout(() =&gt; toast.remove(), 3000);</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">        </span>}</b></span></p>
+<p class="p1"><span class="s1"><b><span class="Apple-converted-space">    </span>&lt;/script&gt;</b></span></p>
+<p class="p1"><span class="s1"><b>&lt;/body&gt;</b></span></p>
+<p class="p1"><span class="s1"><b>&lt;/html&gt;</b></span></p>
 </body>
 </html>
