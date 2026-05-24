@@ -3,23 +3,24 @@ from flask import Flask, request, jsonify, render_template, session
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
-app.secret_key = 'your_secret_key_here'  # 請更換為更安全的密碼
+# 請確保 secret_key 設定正確以維護 Session 安全
+app.secret_key = 'your_secret_key_here' 
 UPLOAD_FOLDER = 'static/uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# 模擬資料庫
-users = {}  # {username: password}
+# 記憶體資料庫
+users = {}  # 格式: {'username': 'password'}
 books_db = []
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
-# --- 認證 API ---
+# --- 認證與用戶 API ---
 @app.route('/user/status', methods=['GET'])
 def get_user_status():
     if 'username' in session:
-        return jsonify({'logged_in': True, 'username': session['username']})
+        return jsonify({'logged_in': True, 'username': session['username'], 'is_admin': True})
     return jsonify({'logged_in': False})
 
 @app.route('/login', methods=['POST'])
@@ -47,15 +48,16 @@ def logout():
     session.clear()
     return jsonify({'status': 'success'})
 
-# --- 書籍 API ---
+# --- 書籍管理 API ---
 @app.route('/books', methods=['GET'])
 def get_books():
     return jsonify(books_db)
 
 @app.route('/upload', methods=['POST'])
 def upload():
+    # 限制僅登入用戶可上傳
     if 'username' not in session:
-        return jsonify({'error': '未登入'}), 401
+        return jsonify({'error': '請先登入'}), 401
     
     files = request.files.getlist('file')
     for file in files:
