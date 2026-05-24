@@ -15,9 +15,11 @@
         .book-card { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; transition: transform 0.2s; }
         .book-card:hover { transform: translateY(-5px); }
         .book-card h4 { margin: 10px 0; font-size: 14px; color: #333; }
-        button { cursor: pointer; padding: 8px 16px; border: none; border-radius: 6px; background: var(--primary); color: white; }
+        .category-tag { font-size: 12px; color: #888; margin-bottom: 10px; }
+        button { cursor: pointer; padding: 6px 12px; border: none; border-radius: 6px; background: var(--primary); color: white; font-size: 12px; margin: 2px; }
+        button.secondary { background: #6c757d; }
 
-        /* 閱讀器視窗 (玻璃擬態) */
+        /* 閱讀器視窗 */
         #reader-container { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(255,255,255,0.95); z-index:1000; display:none; backdrop-filter: blur(10px); }
         .reader-header { display: flex; gap: 10px; padding: 15px; background: #fff; border-bottom: 1px solid #eee; }
     </style>
@@ -51,11 +53,26 @@
             const grid = document.getElementById('book-list');
             grid.innerHTML = books.map(b => `
                 <div class="book-card">
-                    <div style="height:150px; background:#e9ecef; display:flex; align-items:center; justify-content:center; border-radius:8px;">封面</div>
+                    <div style="height:120px; background:#e9ecef; display:flex; align-items:center; justify-content:center; border-radius:8px; margin-bottom:10px;">封面</div>
                     <h4>${b.title}</h4>
-                    <button onclick="openBook('${b.file_url}')">開始閱讀</button>
+                    <div class="category-tag">分類: ${b.series_name}</div>
+                    <button onclick="openBook('${b.file_url}')">閱讀</button>
+                    <button class="secondary" onclick="renameCategory('${b.id}')">改分類</button>
                 </div>
             `).join('');
+        }
+
+        // 改名功能
+        async function renameCategory(bookId) {
+            const newName = prompt("請輸入新分類名稱：");
+            if (!newName) return;
+            const res = await fetch(`/rename_category/${bookId}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({new_category: newName})
+            });
+            if((await res.json()).status === 'success') loadBooks();
+            else alert("修改失敗，請確認權限");
         }
 
         function toggleLoadMode() {
@@ -75,8 +92,10 @@
         function nextPage() { if(rendition) rendition.next(); }
 
         async function uploadBook() {
+            const fileInput = document.getElementById('uploadFile');
+            if(!fileInput.files[0]) return alert("請先選擇檔案");
             const formData = new FormData();
-            formData.append('file', document.getElementById('uploadFile').files[0]);
+            formData.append('file', fileInput.files[0]);
             await fetch('/upload', { method: 'POST', body: formData });
             loadBooks();
         }
