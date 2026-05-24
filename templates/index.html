@@ -4,697 +4,89 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>智能雲端書庫</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- 引入 ePub.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/epub.js/0.3.88/epub.min.js"></script>
     <style>
-        :root {
-            --primary-color: #4a90e2;
-            --primary-hover: #357abd;
-            --bg-color: #f5f7fa;
-            --card-bg: #ffffff;
-            --text-color: #333333;
-            --text-muted: #777777;
-            --border-color: #e1e4e8;
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-
-        body {
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            line-height: 1.6;
-        }
-
-        /* 導覽列 */
-        header {
-            background-color: var(--card-bg);
-            padding: 1rem 2rem;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
-
-        .logo {
-            font-size: 1.5rem;
-            font-weight: bold;
-            color: var(--primary-color);
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .user-panel {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-
-        .btn {
-            padding: 0.5rem 1rem;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: 500;
-            transition: all 0.2s;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .btn-primary { background-color: var(--primary-color); color: white; }
-        .btn-primary:hover { background-color: var(--primary-hover); }
-        .btn-outline { background-color: transparent; border: 1px solid var(--border-color); color: var(--text-color); }
-        .btn-outline:hover { background-color: #eee; }
-        .btn-danger { background-color: #e74c3c; color: white; }
-        .btn-danger:hover { background-color: #c0392b; }
-
-        /* 主佈局 */
-        .container {
-            max-width: 1200px;
-            margin: 2rem auto;
-            padding: 0 1rem;
-            display: grid;
-            grid-template-columns: 280px 1fr;
-            gap: 2rem;
-        }
-
-        /* 左側側邊欄 */
-        .sidebar {
-            background-color: var(--card-bg);
-            padding: 1.5rem;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-            height: fit-content;
-        }
-
-        .sidebar-section {
-            margin-bottom: 2rem;
-        }
-
-        .sidebar-section h3 {
-            font-size: 1rem;
-            margin-bottom: 1rem;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        .category-list {
-            list-style: none;
-        }
-
-        .category-item {
-            padding: 0.75rem 1rem;
-            border-radius: 6px;
-            cursor: pointer;
-            margin-bottom: 0.25rem;
-            transition: background 0.2s;
-            display: flex;
-            justify-content: space-between;
-        }
-
-        .category-item:hover, .category-item.active {
-            background-color: #edf2f7;
-            color: var(--primary-color);
-            font-weight: 600;
-        }
-
-        /* 上傳區域 */
-        .upload-zone {
-            border: 2px dashed #cbd5e0;
-            border-radius: 8px;
-            padding: 2rem 1rem;
-            text-align: center;
-            background: #fafafa;
-            cursor: pointer;
-            transition: all 0.3s;
-            margin-bottom: 1.5rem;
-        }
-
-        .upload-zone:hover, .upload-zone.dragover {
-            border-color: var(--primary-color);
-            background: #f0f7ff;
-        }
-
-        .upload-zone i {
-            font-size: 2.5rem;
-            color: #a0aec0;
-            margin-bottom: 1rem;
-        }
-
-        .upload-actions {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-            margin-top: 1rem;
-        }
-
-        .upload-actions .btn {
-            justify-content: center;
-            font-size: 0.85rem;
-        }
-
-        input[type="file"] {
-            display: none;
-        }
-
-        /* 右側書籍展示區 */
-        .main-content {
-            display: flex;
-            flex-direction: column;
-            gap: 1.5rem;
-        }
-
-        .content-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .book-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 1.5rem;
-        }
-
-        .book-card {
-            background-color: var(--card-bg);
-            border-radius: 8px;
-            padding: 1.25rem;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-            border: 1px solid var(--border-color);
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            position: relative;
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-
-        .book-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-        }
-
-        .book-icon {
-            font-size: 3.5rem;
-            color: #e2e8f0;
-            text-align: center;
-            margin-bottom: 1rem;
-        }
-
-        .book-title {
-            font-weight: 600;
-            font-size: 1rem;
-            margin-bottom: 0.5rem;
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-            height: 3rem;
-        }
-
-        .book-meta {
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            margin-bottom: 1rem;
-        }
-
-        .tag-temp {
-            background: #fff5f5;
-            color: #e53e3e;
-            padding: 0.1rem 0.4rem;
-            border-radius: 4px;
-            font-size: 0.75rem;
-            border: 1px solid #fed7d7;
-        }
-
-        /* 彈窗樣式 */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.5);
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-        }
-
-        .modal-content {
-            background: white;
-            padding: 2rem;
-            border-radius: 8px;
-            width: 100%;
-            max-width: 400px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-        }
-
-        .modal-header {
-            font-size: 1.25rem;
-            font-weight: bold;
-            margin-bottom: 1rem;
-        }
-
-        .form-group {
-            margin-bottom: 1rem;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 0.25rem;
-            font-size: 0.9rem;
-        }
-
-        .form-group input {
-            width: 100%;
-            padding: 0.5rem;
-            border: 1px solid var(--border-color);
-            border-radius: 4px;
-        }
-
-        .modal-footer {
-            display: flex;
-            justify-content: flex-end;
-            gap: 0.5rem;
-            margin-top: 1.5rem;
-        }
-
-        .toggle-auth {
-            font-size: 0.85rem;
-            color: var(--primary-color);
-            cursor: pointer;
-            text-align: center;
-            margin-top: 1rem;
-            text-decoration: underline;
-        }
-
-        /* 通知提示 */
-        .toast-container {
-            position: fixed;
-            bottom: 2rem;
-            right: 2rem;
-            z-index: 2000;
-        }
-
-        .toast {
-            background: #333;
-            color: white;
-            padding: 1rem 1.5rem;
-            border-radius: 6px;
-            margin-top: 0.5rem;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            animation: slideIn 0.3s ease;
-        }
-
-        @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
+        body { font-family: sans-serif; padding: 20px; background: #f4f4f9; }
+        .book-item { background: white; padding: 15px; margin: 10px 0; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
+        #reader-container { position: fixed; top:0; left:0; width:100%; height:100%; background:white; z-index:1000; display:none; }
     </style>
 </head>
 <body>
 
-    <!-- 導覽頂欄 -->
-    <header>
-        <div class="logo">
-            <i class="fa-solid fa-book-open-reader"></i> 智能雲端書庫
-        </div>
-        <div class="user-panel" id="userPanel">
-            <span>載入中...</span>
-        </div>
-    </header>
+    <h1>智能雲端書庫</h1>
+    <div id="auth-status"></div>
+    
+    <input type="file" id="uploadFile">
+    <button onclick="uploadBook()">上傳書籍</button>
 
-    <!-- 主區塊 -->
-    <div class="container">
-        <!-- 左側控制邊欄 -->
-        <div class="sidebar">
-            <div class="sidebar-section">
-                <h3>書籍匯入</h3>
-                <div class="upload-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
-                    <i class="fa-cloud-arrow-up fa-solid"></i>
-                    <p>將 EPUB 拖曳至此<br>或點擊上傳</p>
-                </div>
-                
-                <div class="upload-actions">
-                    <input type="file" id="fileInput" accept=".epub" multiple onchange="handleFileSelect(this.files)">
-                    <button class="btn btn-outline" onclick="document.getElementById('fileInput').click()">
-                        <i class="fa-solid fa-files"></i> 選擇多個檔案
-                    </button>
-                    
-                    <input type="file" id="folderInput" accept=".epub" webkitdirectory directory multiple onchange="handleFileSelect(this.files)">
-                    <button class="btn btn-outline" onclick="document.getElementById('folderInput').click()">
-                        <i class="fa-solid fa-folder-open"></i> 選擇整個資料夾
-                    </button>
-                </div>
-            </div>
+    <div id="book-list"></div>
 
-            <div class="sidebar-section">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                    <h3 style="margin: 0;">分流群組</h3>
-                    <button class="btn btn-outline" style="padding: 0.2rem 0.5rem; font-size: 0.8rem; display: none;" id="addSeriesBtn" onclick="showAddSeriesModal()">+</button>
-                </div>
-                <ul class="category-list" id="seriesList">
-                    <li class="category-item active">全部書籍</li>
-                </ul>
-            </div>
+    <!-- 閱讀器視窗 -->
+    <div id="reader-container">
+        <div style="padding:10px; border-bottom:1px solid #ccc;">
+            <button onclick="closeReader()">關閉</button>
+            <button id="mode-toggle" onclick="toggleLoadMode()">切換模式: 線上串流</button>
+            <button onclick="prevPage()">上一頁</button>
+            <button onclick="nextPage()">下一頁</button>
         </div>
-
-        <!-- 右側主面板 -->
-        <div class="main-content">
-            <div class="content-header">
-                <h2 id="currentCategoryTitle">所有書籍</h2>
-                <span id="bookCount" style="color: var(--text-muted); font-size: 0.9rem;">共 0 本</span>
-            </div>
-            
-            <div class="book-grid" id="bookGrid"></div>
-        </div>
+        <div id="viewer"></div>
     </div>
-
-    <!-- 複合型彈窗組件：會員登入 / 註冊 -->
-    <div class="modal" id="authModal">
-        <div class="modal-content">
-            <div class="modal-header" id="modalTitle">會員登入</div>
-            <div class="form-group">
-                <label>帳號</label>
-                <input type="text" id="authUser">
-            </div>
-            <div class="form-group">
-                <label>密碼</label>
-                <input type="password" id="authPass">
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-outline" onclick="closeModal('authModal')">取消</button>
-                <button class="btn btn-primary" id="authSubmitBtn" onclick="handleAuthSubmit()">登入</button>
-            </div>
-            <div class="toggle-auth" id="toggleAuthText" onclick="toggleAuthMode()">還沒有帳號？立即註冊</div>
-        </div>
-    </div>
-
-    <!-- 彈窗組件：新增分類（管理員專屬） -->
-    <div class="modal" id="seriesModal">
-        <div class="modal-content">
-            <div class="modal-header">新增分流群組</div>
-            <div class="form-group">
-                <label>群組分類名稱</label>
-                <input type="text" id="newSeriesName" placeholder="例如：科幻小說、學習資料">
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-outline" onclick="closeModal('seriesModal')">取消</button>
-                <button class="btn btn-primary" onclick="submitCreateSeries()">建立</button>
-            </div>
-        </div>
-    </div>
-
-    <div class="toast-container" id="toastContainer"></div>
 
     <script>
-        let currentBooks = [];
-        let userInfo = { logged_in: false, username: '', is_admin: false };
-        let isRegisterMode = false; // 用來標記當前是登入還是註冊
+        let currentBook = null, rendition = null, isFullLoadMode = false;
 
-        window.addEventListener('DOMContentLoaded', () => {
-            checkUserStatus();
-            loadBooks();
-            setupDragAndDrop();
-        });
-
-        async function checkUserStatus() {
-            try {
-                const res = await fetch('/user/status');
-                userInfo = await res.json();
-                renderUserPanel();
-            } catch (err) {
-                console.error("無法獲取用戶狀態", err);
-            }
-        }
-
-        function renderUserPanel() {
-            const panel = document.getElementById('userPanel');
-            const addSeriesBtn = document.getElementById('addSeriesBtn');
-            
-            if (userInfo.logged_in) {
-                panel.innerHTML = `
-                    <span><i class="fa-solid fa-user"></i> ${userInfo.username} ${userInfo.is_admin ? '<span style="color:gold; font-size:0.8rem;">[管理員]</span>' : ''}</span>
-                    <button class="btn btn-danger" onclick="submitLogout()">登出</button>
-                `;
-                if (userInfo.is_admin) addSeriesBtn.style.display = 'block';
-            } else {
-                panel.innerHTML = `
-                    <button class="btn btn-outline" onclick="openAuthModal()">會員登入/註冊</button>
-                `;
-                addSeriesBtn.style.display = 'none';
-            }
-        }
-
-        // 開啟驗證彈窗，預設為登入模式
-        function openAuthModal() {
-            isRegisterMode = false;
-            document.getElementById('modalTitle').innerText = "會員登入";
-            document.getElementById('authSubmitBtn').innerText = "登入";
-            document.getElementById('toggleAuthText').innerText = "還沒有帳號？立即註冊";
-            document.getElementById('authUser').value = "";
-            document.getElementById('authPass').value = "";
-            showModal('authModal');
-        }
-
-        // 切換登入與註冊模式
-        function toggleAuthMode() {
-            isRegisterMode = !isRegisterMode;
-            if (isRegisterMode) {
-                document.getElementById('modalTitle').innerText = "註冊新帳號";
-                document.getElementById('authSubmitBtn').innerText = "註冊";
-                document.getElementById('toggleAuthText').innerText = "已有帳號？前往登入";
-            } else {
-                document.getElementById('modalTitle').innerText = "會員登入";
-                document.getElementById('authSubmitBtn').innerText = "登入";
-                document.getElementById('toggleAuthText').innerText = "還沒有帳號？立即註冊";
-            }
-        }
-
-        // 統一處理登入或註冊提交
-        async function handleAuthSubmit() {
-            const username = document.getElementById('authUser').value.trim();
-            const password = document.getElementById('authPass').value.trim();
-
-            if (!username || !password) {
-                alert("請填寫帳號與密碼！");
-                return;
-            }
-
-            if (isRegisterMode) {
-                // 執行註冊邏輯
-                const res = await fetch('/register', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password })
-                });
-                const result = await res.json();
-                if (res.ok) {
-                    showToast("🟢 註冊成功！請直接登入");
-                    toggleAuthMode(); // 註冊完自動切回登入畫面
-                } else {
-                    alert("註冊失敗: " + (result.error || "帳號已被使用"));
-                }
-            } else {
-                // 執行登入邏輯
-                const res = await fetch('/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password })
-                });
-
-                if (res.ok) {
-                    closeModal('authModal');
-                    showToast("🟢 登入成功！歡迎回來");
-                    checkUserStatus();
-                    loadBooks();
-                } else {
-                    alert("登入失敗，請檢查您的帳號密碼是否正確！");
-                }
-            }
-        }
-
-        async function submitLogout() {
-            await fetch('/logout', { method: 'POST' });
-            showToast("🔒 已安全登出");
-            checkUserStatus();
-            loadBooks();
-        }
-
+        // 1. 載入書單
         async function loadBooks() {
-            try {
-                const res = await fetch('/books');
-                currentBooks = await res.json();
-                renderBookGrid(currentBooks);
-                updateSeriesList();
-            } catch (err) {
-                showToast("🔴 無法載入書籍清單");
-            }
+            const res = await fetch('/books');
+            const books = await res.json();
+            const list = document.getElementById('book-list');
+            list.innerHTML = `<h3>共 ${books.length} 本</h3>`;
+            books.forEach(b => {
+                list.innerHTML += `
+                    <div class="book-item">
+                        <span>${b.title}</span>
+                        <button onclick="openBook('${b.file_url}')">閱讀</button>
+                    </div>`;
+            });
         }
 
-        function renderBookGrid(books) {
-            const grid = document.getElementById('bookGrid');
-            document.getElementById('bookCount').innerText = `共 ${books.length} 本`;
-            
-            if (books.length === 0) {
-                grid.innerHTML = `
-                    <div style="grid-column: 1/-1; text-align: center; color: #a0aec0; padding: 3rem 0;">
-                        <i class="fa-solid fa-box-open" style="font-size: 3rem; margin-bottom: 1rem;"></i>
-                        <p>書庫空空如也，立刻在左側批次匯入 EPUB 書籍吧！</p>
-                    </div>
-                `;
-                return;
-            }
-
-            grid.innerHTML = books.map(book => `
-                <div class="book-card">
-                    <div class="book-icon"><i class="fa-solid fa-file-lines" style="color: #4a90e2;"></i></div>
-                    <div class="book-title" title="${book.title}">${book.title}</div>
-                    <div class="book-meta">
-                        <div>分類: ${book.series_name}</div>
-                        <div style="margin-top: 0.25rem;">上傳者: ${book.uploader} ${book.is_temporary ? '<span class="tag-temp">暫存</span>' : ''}</div>
-                    </div>
-                    <a href="/books/${book.id}/download/txt" class="btn btn-primary" style="font-size: 0.85rem; justify-content: center; width: 100%;">
-                        <i class="fa-solid fa-file-arrow-down"></i> 一鍵導出 TXT
-                    </a>
-                </div>
-            `).join('');
+        // 2. 閱讀器控制
+        function toggleLoadMode() {
+            isFullLoadMode = !isFullLoadMode;
+            document.getElementById('mode-toggle').innerText = isFullLoadMode ? "模式: 一次載入" : "模式: 線上串流";
         }
 
-        function updateSeriesList() {
-            const list = document.getElementById('seriesList');
-            const categories = ['全部書籍', ...new Set(currentBooks.map(b => b.series_name))];
-            
-            list.innerHTML = categories.map((cat, idx) => `
-                <li class="category-item ${idx === 0 ? 'active' : ''}" onclick="filterCategory(this, '${cat}')">
-                    <span><i class="fa-solid fa-folder" style="margin-right:0.5rem; color:#f39c12;"></i>${cat}</span>
-                </li>
-            `).join('');
-        }
-
-        function filterCategory(element, category) {
-            document.querySelectorAll('.category-item').forEach(el => el.classList.remove('active'));
-            element.classList.add('active');
-            document.getElementById('currentCategoryTitle').innerText = category;
-            
-            if (category === '全部書籍') {
-                renderBookGrid(currentBooks);
+        async function openBook(fileUrl) {
+            document.getElementById('reader-container').style.display = 'block';
+            if (isFullLoadMode) {
+                const res = await fetch(fileUrl);
+                currentBook = ePub(await res.arrayBuffer());
             } else {
-                const filtered = currentBooks.filter(b => b.series_name === category);
-                renderBookGrid(filtered);
+                currentBook = ePub(fileUrl);
             }
+            rendition = currentBook.renderTo("viewer", { width: "100%", height: "90%" });
+            rendition.display();
         }
 
-        async function handleFileSelect(fileList) {
-            if (fileList.length === 0) return;
+        function closeReader() {
+            document.getElementById('reader-container').style.display = 'none';
+            document.getElementById('viewer').innerHTML = '';
+        }
 
+        function prevPage() { if(rendition) rendition.prev(); }
+        function nextPage() { if(rendition) rendition.next(); }
+
+        // 3. 上傳功能
+        async function uploadBook() {
+            const fileInput = document.getElementById('uploadFile');
             const formData = new FormData();
-            let validCount = 0;
-
-            for (let i = 0; i < fileList.length; i++) {
-                if (fileList[i].name.endsWith('.epub') || fileList[i].type === "application/epub+zip") {
-                    formData.append('file', fileList[i]);
-                    validCount++;
-                }
-            }
-
-            if (validCount === 0) {
-                alert("所選檔案中沒有合法的 EPUB 電子書！");
-                return;
-            }
-
-            showToast(`⏳ 正在上傳並解析 ${validCount} 個檔案，請稍候...`);
-
-            try {
-                const response = await fetch('/upload', {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                const result = await response.json();
-                if (response.ok) {
-                    showToast(`🎉 ${result.message}`);
-                    loadBooks();
-                } else {
-                    alert("上傳失敗: " + result.error);
-                }
-            } catch (err) {
-                console.error(err);
-                showToast("🔴 批次上傳過程中發生連線異常");
-            }
+            formData.append('file', fileInput.files[0]);
+            await fetch('/upload', { method: 'POST', body: formData });
+            loadBooks();
         }
 
-        function setupDragAndDrop() {
-            const dropZone = document.getElementById('dropZone');
-
-            ['dragenter', 'dragover'].forEach(eventName => {
-                dropZone.addEventListener(eventName, (e) => {
-                    e.preventDefault();
-                    dropZone.classList.add('dragover');
-                }, false);
-            });
-
-            ['dragleave', 'drop'].forEach(eventName => {
-                dropZone.addEventListener(eventName, (e) => {
-                    e.preventDefault();
-                    dropZone.classList.remove('dragover');
-                }, false);
-            });
-
-            dropZone.addEventListener('drop', (e) => {
-                const dt = e.dataTransfer;
-                const files = dt.files;
-                handleFileSelect(files);
-            }, false);
-        }
-
-        async function submitCreateSeries() {
-            const name = document.getElementById('newSeriesName').value;
-            const res = await fetch('/series', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name })
-            });
-
-            const result = await res.json();
-            if (res.ok) {
-                closeModal('seriesModal');
-                showToast(`📁 成功建立新分流群組：${name}`);
-                loadBooks();
-            } else {
-                alert("建立失敗: " + result.error);
-            }
-        }
-
-        function showModal(id) { document.getElementById(id).style.display = 'flex'; }
-        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-        function showAddSeriesModal() { showModal('seriesModal'); }
-
-        document.getElementById('authModal').addEventListener('click', function(e) {
-            if(e.target === this) closeModal('authModal');
-        });
-        document.getElementById('seriesModal').addEventListener('click', function(e) {
-            if(e.target === this) closeModal('seriesModal');
-        });
-
-        function showToast(text) {
-            const container = document.getElementById('toastContainer');
-            const toast = document.createElement('div');
-            toast.className = 'toast';
-            toast.innerHTML = `<i class="fa-solid fa-circle-info"></i> <span>${text}</span>`;
-            container.appendChild(toast);
-            setTimeout(() => toast.remove(), 4000);
-        }
+        loadBooks();
     </script>
 </body>
 </html>
