@@ -4,84 +4,79 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>智能雲端書庫</title>
-    <!-- 引入 ePub.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/epub.js/0.3.88/epub.min.js"></script>
     <style>
-        body { font-family: sans-serif; padding: 20px; background: #f4f4f9; }
-        .book-item { background: white; padding: 15px; margin: 10px 0; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
-        #reader-container { position: fixed; top:0; left:0; width:100%; height:100%; background:white; z-index:1000; display:none; }
+        :root { --primary: #4a90e2; --bg: #f8f9fa; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; padding: 20px; }
+        .container { max-width: 1000px; margin: auto; }
+        
+        /* 書籍網格 */
+        .book-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 20px; margin-top: 20px; }
+        .book-card { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; transition: transform 0.2s; }
+        .book-card:hover { transform: translateY(-5px); }
+        .book-card h4 { margin: 10px 0; font-size: 14px; color: #333; }
+        button { cursor: pointer; padding: 8px 16px; border: none; border-radius: 6px; background: var(--primary); color: white; }
+
+        /* 閱讀器視窗 (玻璃擬態) */
+        #reader-container { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(255,255,255,0.95); z-index:1000; display:none; backdrop-filter: blur(10px); }
+        .reader-header { display: flex; gap: 10px; padding: 15px; background: #fff; border-bottom: 1px solid #eee; }
     </style>
 </head>
 <body>
+    <div class="container">
+        <h1>📚 我的智能書庫</h1>
+        <div style="margin-bottom: 20px;">
+            <input type="file" id="uploadFile">
+            <button onclick="uploadBook()">+ 上傳新書</button>
+        </div>
+        <div id="book-list" class="book-grid"></div>
+    </div>
 
-    <h1>智能雲端書庫</h1>
-    <div id="auth-status"></div>
-    
-    <input type="file" id="uploadFile">
-    <button onclick="uploadBook()">上傳書籍</button>
-
-    <div id="book-list"></div>
-
-    <!-- 閱讀器視窗 -->
     <div id="reader-container">
-        <div style="padding:10px; border-bottom:1px solid #ccc;">
-            <button onclick="closeReader()">關閉</button>
-            <button id="mode-toggle" onclick="toggleLoadMode()">切換模式: 線上串流</button>
+        <div class="reader-header">
+            <button onclick="closeReader()">⬅️ 關閉</button>
+            <button id="mode-toggle" onclick="toggleLoadMode()">模式: 串流</button>
             <button onclick="prevPage()">上一頁</button>
             <button onclick="nextPage()">下一頁</button>
         </div>
-        <div id="viewer"></div>
+        <div id="viewer" style="width:100%; height:90vh;"></div>
     </div>
 
     <script>
         let currentBook = null, rendition = null, isFullLoadMode = false;
 
-        // 1. 載入書單
         async function loadBooks() {
             const res = await fetch('/books');
             const books = await res.json();
-            const list = document.getElementById('book-list');
-            list.innerHTML = `<h3>共 ${books.length} 本</h3>`;
-            books.forEach(b => {
-                list.innerHTML += `
-                    <div class="book-item">
-                        <span>${b.title}</span>
-                        <button onclick="openBook('${b.file_url}')">閱讀</button>
-                    </div>`;
-            });
+            const grid = document.getElementById('book-list');
+            grid.innerHTML = books.map(b => `
+                <div class="book-card">
+                    <div style="height:150px; background:#e9ecef; display:flex; align-items:center; justify-content:center; border-radius:8px;">封面</div>
+                    <h4>${b.title}</h4>
+                    <button onclick="openBook('${b.file_url}')">開始閱讀</button>
+                </div>
+            `).join('');
         }
 
-        // 2. 閱讀器控制
         function toggleLoadMode() {
             isFullLoadMode = !isFullLoadMode;
-            document.getElementById('mode-toggle').innerText = isFullLoadMode ? "模式: 一次載入" : "模式: 線上串流";
+            document.getElementById('mode-toggle').innerText = isFullLoadMode ? "模式: 全載" : "模式: 串流";
         }
 
         async function openBook(fileUrl) {
             document.getElementById('reader-container').style.display = 'block';
-            if (isFullLoadMode) {
-                const res = await fetch(fileUrl);
-                currentBook = ePub(await res.arrayBuffer());
-            } else {
-                currentBook = ePub(fileUrl);
-            }
-            rendition = currentBook.renderTo("viewer", { width: "100%", height: "90%" });
+            currentBook = isFullLoadMode ? ePub(await (await fetch(fileUrl)).arrayBuffer()) : ePub(fileUrl);
+            rendition = currentBook.renderTo("viewer", { width: "100%", height: "100%" });
             rendition.display();
         }
 
-        function closeReader() {
-            document.getElementById('reader-container').style.display = 'none';
-            document.getElementById('viewer').innerHTML = '';
-        }
-
+        function closeReader() { document.getElementById('reader-container').style.display = 'none'; document.getElementById('viewer').innerHTML = ''; }
         function prevPage() { if(rendition) rendition.prev(); }
         function nextPage() { if(rendition) rendition.next(); }
 
-        // 3. 上傳功能
         async function uploadBook() {
-            const fileInput = document.getElementById('uploadFile');
             const formData = new FormData();
-            formData.append('file', fileInput.files[0]);
+            formData.append('file', document.getElementById('uploadFile').files[0]);
             await fetch('/upload', { method: 'POST', body: formData });
             loadBooks();
         }
