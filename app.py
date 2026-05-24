@@ -2,6 +2,7 @@ import os
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from flask_session import Session
 from supabase import create_client, Client
+from supabase.client import ClientOptions
 from werkzeug.utils import secure_filename
 import ebooklib
 from ebooklib import epub
@@ -21,9 +22,15 @@ Session(app)
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 
+# 💡 自動防呆：透過 ClientOptions 強制加上 headers
+# 這樣無論你 Render 環境變數填新金鑰 (sb_secret_) 還是舊金鑰 (eyJ...)，都不會噴 Invalid API key
+supabase_options = ClientOptions(
+    postgrest_client_timeout=10,
+    headers={"apiKey": SUPABASE_KEY} if SUPABASE_KEY else {}
+)
+
 # 初始化 Supabase 用戶端
-# 提示：請確保後台 SUPABASE_URL 為 .co 結尾，SUPABASE_KEY 為 eyJ... 開頭的 Legacy 密鑰
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY, options=supabase_options)
 
 # 暫存上傳檔案的資料夾配置
 UPLOAD_FOLDER = '/tmp' if os.environ.get('RENDER') else 'uploads'
@@ -34,9 +41,8 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 @app.route('/')
 def index():
-    """首頁：展示書籍列表"""
+    """首頁：展示書籍列表（標準後端渲染）"""
     try:
-        # 從 Supabase 讀取所有書籍
         response = supabase.table('books').select('*').execute()
         books = response.data if response.data else []
     except Exception as e:
@@ -153,7 +159,7 @@ def upload_file():
         except Exception as e:
             flash(f"書籍處理或資料庫寫入失敗：{str(e)}", "danger")
         finally:
-            # 清理本機暫存檔案（因為檔案稍後可從前端再讀取或已完成解析）
+            # 清理本機暫存檔案
             if os.path.exists(filepath):
                 os.remove(filepath)
                 
@@ -192,9 +198,32 @@ def delete_book(book_id):
     return redirect(url_for('index'))
 
 
-# --- 4. 啟動進入點 ---
+# --- 4. 前端 JavaScript AJAX 請求所需的 API 接口（解決 404 轉圈圈問題） ---
+
+@app.route('/books', methods=['GET'])
+def api_get_books():
+    """提供前端 AJAX 非同步載入書籍清單"""
+    try:
+        response = supabase.table('books').select('*').execute()
+        return {"status": "success", "data": response.data if response.data else []}, 200
+    except Exception as e:
+        return {"status": "error", "message": str(e)}, 500
+
+
+@app.route('/user/status', methods=['GET'])
+def api_user_status():
+    """提供前端 AJAX 檢查目前使用者的登入狀態"""
+    if 'user' in session:
+        return {
+            "logged_in": True,
+            "username": session['user'],
+            "is_admin": session.get('is_admin', False)
+        }, 200
+    return {"logged_in": False}, 200
+
+
+# --- 5. 啟動進入點 ---
 if __name__ == '__main__':
-    # 本地測試時若無環境變數，提示開發者
     if not SUPABASE_URL or not SUPABASE_KEY:
         print("⚠️ 警告: 偵測到未設定 SUPABASE_URL 或 SUPABASE_KEY 環境變數。")
     app.run(debug=True)
