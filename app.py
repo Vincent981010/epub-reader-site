@@ -1,8 +1,8 @@
 import os
 import uuid
-import json
-from flask import Flask, request, jsonify, render_template, session, send_file, Response
+from flask import Flask, request, jsonify, session, Response, send_file
 from flask_session import Session
+from supabase import create_client, Client
 import ebooklib
 from ebooklib import epub
 from bs4 import BeautifulSoup
@@ -14,52 +14,18 @@ app.config["SECRET_KEY"] = os.urandom(24)
 app.config["SESSION_TYPE"] = "filesystem"
 Session(app)
 
-# 📂 資料持久化路徑設定
-USERS_FILE = "users.json"
-BOOKS_FILE = "books.json"
+# 🌐 串接 Supabase 雲端資料庫環境變數
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 
-# 初始化使用者資料 (確保至少有預設管理員)
-def load_users():
-    if os.path.exists(USERS_FILE):
-        try:
-            with open(USERS_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            pass
-    # 預設初始資料
-    return {
-        "admin": {"password": "admin123", "is_admin": True},
-        "user1": {"password": "user1password", "is_admin": False}
-    }
+# 如果在本地電腦測試且尚未設定環境變數，可以在下方填入你的金鑰（上傳 GitHub 前記得刪除以免洩漏）
+if not SUPABASE_URL or not SUPABASE_KEY:
+    SUPABASE_URL = "你的_SUPABASE_URL"
+    SUPABASE_KEY = "你的_SUPABASE_ANON_KEY"
 
-def save_users(users_data):
-    with open(USERS_FILE, "w", encoding="utf-8") as f:
-        json.dump(users_data, f, ensure_ascii=False, indent=4)
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# 初始化書籍資料
-def load_books():
-    if os.path.exists(BOOKS_FILE):
-        try:
-            with open(BOOKS_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            pass
-    return []
-
-def save_books(books_data):
-    with open(BOOKS_FILE, "w", encoding="utf-8") as f:
-        json.dump(books_data, f, ensure_ascii=False, indent=4)
-
-# 載入初始資料
-USERS = load_users()
-BOOKS = load_books()
 SERIES = ["預設分類"]
-
-# 確保每次有新分類時也能從書籍中提取
-for b in BOOKS:
-    if b["series_name"] not in SERIES:
-        SERIES.append(b["series_name"])
-
 
 # 首頁路由
 @app.route('/')
@@ -85,35 +51,41 @@ def user_status():
 
 @app.route('/login', methods=['POST'])
 def login():
-    global USERS
-    USERS = load_users() # 登入時重新讀取，確保拿到最新註冊的資料
     data = request.get_json()
     username = data.get("username")
     password = data.get("password")
     
-    user = USERS.get(username)
-    if user and user["password"] == password:
+    # 從 Supabase 雲端資料庫查詢使用者
+    response = supabase.table("users").select("*").eq("username", username).execute()
+    user_list = response.data
+    
+    if user_list and user_list[0]["password"] == password:
         session["username"] = username
-        session["is_admin"] = user["is_admin"]
+        session["is_admin"] = user_list[0]["is_admin"]
         return "", 200
     return "Unauthorized", 401
 
 @app.route('/register', methods=['POST'])
 def register():
-    global USERS
-    USERS = load_users() # 註冊前重新讀取最新狀態
     data = request.get_json()
     username = data.get("username", "").strip()
     password = data.get("password", "").strip()
     
-    if not username || !password:
+    # 修正先前的語法錯誤，改為正確的 Python 邏輯運算子
+    if not username or not password:
         return jsonify({"success": False, "error": "帳號密碼不能為空"}), 400
 
-    if username in USERS:
+    # 檢查帳號是否已被註冊
+    check_user = supabase.table("users").select("username").eq("username", username).execute()
+    if check_user.data:
         return jsonify({"success": False, "error": "帳號已被註冊"}), 400
         
-    USERS[username] = {"password": password, "is_admin": False}
-    save_users(USERS) # 💾 寫入 JSON 檔案永久儲存
+    # 寫入 Supabase 雲端資料庫
+    supabase.table("users").insert({
+        "username": username,
+        "password": password,
+        "is_admin": False
+    }).execute()
     
     return jsonify({"success": True})
 
@@ -125,16 +97,13 @@ def logout():
 # 📥 書籍管理 API
 @app.route('/books', methods=['GET'])
 def get_books():
-    global BOOKS
-    BOOKS = load_books() # 獲取時重新讀取
-    return jsonify(BOOKS)
+    # 從雲端資料庫獲取所有書籍目錄
+    response = supabase.table("books").select("*").execute()
+    return jsonify(response.data)
 
 # 📥 批次上傳 API
 @app.route('/upload', methods=['POST'])
 def upload_file():
-    global BOOKS
-    BOOKS = load_books()
-    
     if 'file' not in request.files:
         return jsonify({"error": "沒有檔案欄位"}), 400
         
@@ -146,12 +115,13 @@ def upload_file():
     uploaded_books = []
     errors = []
     
+    # 建立本地暫存資料夾（僅供解析結構使用）
+    upload_dir = "uploads"
+    os.makedirs(upload_dir, exist_ok=True)
+    
     for file in files:
         if file and file.filename.endswith('.epub'):
             book_id = str(uuid.uuid4())
-            upload_dir = "uploads"
-            os.makedirs(upload_dir, exist_ok=True)
-            
             base_filename = os.path.basename(file.filename)
             file_path = os.path.join(upload_dir, f"{book_id}.epub")
             file.save(file_path)
@@ -171,13 +141,14 @@ def upload_file():
                 "is_temporary": not is_logged_in,
                 "uploader": session["username"] if is_logged_in else "匿名訪客"
             }
-            BOOKS.append(new_book)
+            
+            # 將書籍 meta 資訊安全地寫入 Supabase
+            supabase.table("books").insert(new_book).execute()
             uploaded_books.append(new_book)
         else:
             if file.filename:
                 errors.append(f"檔案 {file.filename} 格式不符，已被系統跳過")
 
-    save_books(BOOKS) # 💾 上傳成功後寫入 JSON 檔案永久儲存
     return jsonify({
         "message": f"成功匯入並解析 {len(uploaded_books)} 本書籍！",
         "books": uploaded_books,
@@ -187,14 +158,18 @@ def upload_file():
 # 📥 一鍵導出 TXT API
 @app.route('/books/<book_id>/download/txt', methods=['GET'])
 def download_txt(book_id):
-    BOOKS = load_books()
-    book = next((b for b in BOOKS if b["id"] == book_id), None)
-    if not book:
+    # 從雲端資料庫確認書籍是否存在
+    response = supabase.table("books").select("*").eq("id", book_id).execute()
+    if not response.data:
         return "Book not found", 404
         
+    book = response.data[0]
     file_path = os.path.join("uploads", f"{book_id}.epub")
     txt_path = os.path.join("uploads", f"{book_id}.txt")
     
+    if not os.path.exists(file_path):
+        return "本地暫存檔案已隨伺服器重啟釋放，無法導出。請嘗試重新拖入解析！", 410
+        
     try:
         epub_book = epub.read_epub(file_path)
         full_text = []
