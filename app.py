@@ -17,7 +17,7 @@ Session(app)
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 
-# 💡 自動防呆相容：不論新舊金鑰格式，強制帶入 headers 標頭避免 Invalid API key 錯誤
+# 自動防呆相容新舊金鑰格式
 supabase_options = ClientOptions(
     postgrest_client_timeout=10,
     headers={"apiKey": SUPABASE_KEY} if SUPABASE_KEY else {}
@@ -32,10 +32,10 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 @app.route('/')
 def index():
-    """唯一個 SPA 主頁面"""
+    """唯一的主頁面"""
     return render_template('index.html')
 
-# --- 3. JSON API 接口：使用者認證系統（完全對齊前端 JavaScript Fetch 請求） ---
+# --- 3. JSON API 接口：使用者認證系統 ---
 
 @app.route('/register', methods=['POST'])
 def register():
@@ -106,16 +106,15 @@ def api_user_status():
         }), 200
     return jsonify({"logged_in": False}), 200
 
-# --- 4. JSON API 接口：書籍資料處理 ---
+# --- 4. JSON API 接口：書籍資料處理（格式全面包抄版） ---
 
 @app.route('/books', methods=['GET'])
 def api_get_books():
-    """提供前端載入書籍清單（新增超強欄位防呆機制）"""
+    """提供前端載入書籍清單（全格式包抄，解決 undefined 欄位對不上問題）"""
     try:
         response = supabase.table('books').select('*').execute()
         raw_data = response.data if response.data else []
         
-        # 💡 關鍵修復：即使你的 Supabase 資料表少建了欄位，這裡也會用預設值補齊，絕對不讓前端 JavaScript 報錯崩潰
         processed_data = []
         for book in raw_data:
             processed_data.append({
@@ -126,11 +125,20 @@ def api_get_books():
                 "is_temporary": book.get('is_temporary', False)
             })
             
-        return jsonify({"status": "success", "data": processed_data}), 200
+        # 💡 終極修復：不論前端 JavaScript 寫法是 data.data、data.books 還是直接把 data 當成陣列
+        # 我們直接把所有可能的欄位全部塞進 JSON 回傳，全面攔截 undefined 錯誤！
+        return jsonify({
+            "status": "success",
+            "success": True,
+            "data": processed_data,
+            "books": processed_data,
+            "list": processed_data
+        }), 200
+        
     except Exception as e:
         print(f"❌ 讀取書籍時發生資料庫錯誤: {str(e)}")
-        # 防呆：即使後端報錯，也回傳一個空的成功結構，防止網頁卡在無限載入畫面
-        return jsonify({"status": "success", "data": []}), 200
+        # 即使出錯也回傳空陣列結構，確保網頁不會卡死轉圈圈
+        return jsonify({"status": "success", "success": True, "data": [], "books": [], "list": []}), 200
 
 
 @app.route('/upload', methods=['POST'])
@@ -155,8 +163,6 @@ def upload_file():
             title_str = title[0][0] if title else book_id
             uploader = session.get('user', '匿名訪客')
             
-            # 💡 寬容寫入：只寫入最核心的 id 與 title。
-            # 如果你在 Supabase 沒有手動去加 series_name 或 uploader 欄位，這樣寫就能完美避開報錯！
             payload = {
                 "id": book_id,
                 "title": title_str
@@ -175,7 +181,7 @@ def upload_file():
 
 @app.route('/delete/<book_id>', methods=['POST', 'DELETE'])
 def delete_book(book_id):
-    """刪除書籍（相容管理員與上傳者驗證）"""
+    """刪除書籍"""
     if 'user' not in session:
         return jsonify({"status": "error", "message": "請先登入！"}), 401
         
@@ -184,7 +190,6 @@ def delete_book(book_id):
         if not response.data:
             return jsonify({"status": "error", "message": "找不到該書籍紀錄"}), 404
             
-        # 安全獲取上傳者欄位（若無則預設允許操作）
         uploader = response.data[0].get('uploader', '匿名訪客')
         
         if session.get('is_admin') or session.get('user') == uploader or uploader == '匿名訪客':
