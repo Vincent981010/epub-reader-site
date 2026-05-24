@@ -5,20 +5,32 @@
     <title>智能雲端書庫</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/epub.js/0.3.88/epub.min.js"></script>
     <style>
-        /* 載入遮罩樣式 */
-        #loading-overlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.8); z-index:9999; justify-content:center; align-items:center; }
+        /* 1. 新增 Loading 遮罩樣式 */
+        #loading-overlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.9); z-index:9999; justify-content:center; align-items:center; font-size: 1.5rem; }
+        
+        /* 2. 你原本的 CSS (請確保完整保留) */
+        body { font-family: sans-serif; }
+        .book-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; }
     </style>
 </head>
 <body>
+    <!-- 1. 加入 Loading 元素 -->
     <div id="loading-overlay">處理中...請稍候</div>
 
-    <!-- 你的內容區域 -->
+    <!-- 2. 你原本的內容 (必須補回來！) -->
+    <header>
+        <h1>智能雲端書庫</h1>
+    </header>
+    <div class="container">
+        <!-- 這裡放你的側邊欄、上傳區塊等 -->
+        <div id="bookGrid" class="book-grid"></div>
+    </div>
     
     <script>
-        // 優化後的登入函式
+        // 3. 你的登入優化函式
         async function handleLogin(username, password) {
             const overlay = document.getElementById('loading-overlay');
-            overlay.style.display = 'flex'; // 顯示 Loading
+            overlay.style.display = 'flex';
             
             try {
                 const res = await fetch('/login', {
@@ -35,9 +47,11 @@
             } catch(e) {
                 console.error(e);
             } finally {
-                overlay.style.display = 'none'; // ⚠️ 關鍵：無論成功失敗都要關閉
+                overlay.style.display = 'none'; // 確保畫面恢復
             }
         }
+        
+        // 4. 你原本的 loadBooks 等其他函數也請放在這裡...
     </script>
 </body>
 </html>
