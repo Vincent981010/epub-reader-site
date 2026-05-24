@@ -5,94 +5,403 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>智能雲端書庫</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- 補上 EPUB 解析必備的 JSZip -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/epub.js/0.3.88/epub.min.js"></script>
     <style>
-        :root { --primary-color: #3b82f6; --text-main: #1f2937; --bg-body: #f3f4f6; --bg-panel: #ffffff; --border-color: #e5e7eb; }
-        body { font-family: sans-serif; margin: 0; background-color: var(--bg-body); }
-        .container { display: flex; max-width: 1400px; margin: auto; padding: 20px; gap: 20px; }
-        .main-content { flex: 1; background: var(--bg-panel); padding: 2rem; border-radius: 8px; }
-        .book-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1.5rem; }
-        .book-card { border: 1px solid var(--border-color); padding: 1rem; border-radius: 8px; cursor: pointer; position: relative; background: #fff; }
-        .action-btns { position: absolute; top: 5px; right: 5px; display: flex; gap: 5px; z-index: 10; }
-        .btn { padding: 5px 10px; cursor: pointer; border: 1px solid var(--border-color); background: #fff; border-radius: 4px; }
+        :root { --primary-color: #3b82f6; --primary-hover: #2563eb; --text-main: #1f2937; --text-muted: #6b7280; --bg-body: #f3f4f6; --bg-panel: #ffffff; --border-color: #e5e7eb; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; background-color: var(--bg-body); color: var(--text-main); display: flex; flex-direction: column; min-height: 100vh; }
+        header { background-color: var(--bg-panel); padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .logo { font-size: 1.5rem; font-weight: 600; color: var(--primary-color); }
+        .user-panel { font-size: 0.95rem; font-weight: 500; }
+        .container { display: flex; flex: 1; max-width: 1400px; margin: 0 auto; width: 100%; padding: 20px; gap: 20px; box-sizing: border-box; }
+        .sidebar { width: 280px; background: var(--bg-panel); padding: 1.5rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); height: fit-content; }
+        .sidebar-section { margin-bottom: 2rem; }
+        .sidebar-section h3 { font-size: 1.1rem; margin-top: 0; margin-bottom: 1rem; border-bottom: 2px solid var(--border-color); padding-bottom: 0.5rem; }
+        .upload-zone { border: 2px dashed #cbd5e0; border-radius: 8px; padding: 2rem 1rem; text-align: center; cursor: pointer; transition: all 0.2s; background: #fafafa; margin-bottom: 1rem; }
+        .upload-zone:hover { border-color: var(--primary-color); background: #eff6ff; }
+        .upload-zone i { font-size: 2rem; color: var(--primary-color); margin-bottom: 0.5rem; }
+        .upload-zone p { margin: 0; font-size: 0.9rem; color: var(--text-muted); }
+        input[type="file"] { display: none; }
+        .upload-actions { display: flex; flex-direction: column; gap: 0.5rem; }
+        .btn { padding: 0.5rem 1rem; border-radius: 6px; border: none; cursor: pointer; font-size: 0.9rem; transition: background 0.2s; display: flex; align-items: center; justify-content: center; gap: 0.5rem; }
+        .btn-primary { background: var(--primary-color); color: white; }
+        .btn-primary:hover { background: var(--primary-hover); }
+        .btn-outline { background: transparent; border: 1px solid var(--border-color); color: var(--text-main); }
+        .btn-outline:hover { background: #f9fafb; border-color: #d1d5db; }
         
-        /* Wenku8 風格閱讀器 */
-        #readerModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; flex-direction: column; }
-        .reader-header { background: #fdf6ec; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; }
-        #viewer { flex: 1; background: #fdf6ec; padding: 2rem 15%; overflow-y: auto; cursor: pointer; }
+        .btn-danger { background: transparent; color: #ef4444; border: none; padding: 0.3rem; border-radius: 4px; cursor: pointer; transition: background 0.2s; }
+        .btn-danger:hover { background: #fee2e2; }
+        .btn-icon { background: transparent; color: var(--primary-color); border: none; padding: 0.3rem; border-radius: 4px; cursor: pointer; transition: background 0.2s; }
+        .btn-icon:hover { background: #eff6ff; }
+
+        .category-list { list-style: none; padding: 0; margin: 0; }
+        .category-item { padding: 0.75rem 1rem; border-radius: 6px; cursor: pointer; margin-bottom: 0.25rem; transition: background 0.2s; color: var(--text-muted); }
+        .category-item:hover { background: #f3f4f6; color: var(--text-main); }
+        .category-item.active { background: #eff6ff; color: var(--primary-color); font-weight: 600; }
+        .main-content { flex: 1; background: var(--bg-panel); padding: 2rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .content-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; }
+        .content-header h2 { margin: 0; font-size: 1.5rem; }
+        .book-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1.5rem; }
+        .book-card { background: #fff; border: 1px solid var(--border-color); border-radius: 8px; padding: 1.2rem 1rem; text-align: center; transition: transform 0.2s, box-shadow 0.2s; cursor: pointer; position: relative; }
+        .book-card:hover { transform: translateY(-3px); box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-color: var(--primary-color); }
+        .book-title { font-weight: 600; margin-bottom: 0.8rem; font-size: 1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; margin-top: 1.5rem; }
+        .book-category { font-size: 0.8rem; color: var(--text-muted); background: #f3f4f6; padding: 0.3rem 0.6rem; border-radius: 4px; display: inline-block; float: left; }
+        .action-btn-wrapper { position: absolute; top: 0.5rem; right: 0.5rem; display: flex; gap: 0.2rem; }
+        #loading-overlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.8); z-index:9999; justify-content:center; align-items:center; font-size: 1.2rem; font-weight: bold; color: var(--primary-color); }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-content { background: #fff; padding: 2rem; border-radius: 12px; width: 100%; max-width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+        .reader-modal-content { max-width: 95vw; width: 1000px; height: 90vh; display: flex; flex-direction: column; padding: 1.5rem; }
+        #viewer { flex: 1; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #fafafa; margin: 1rem 0; position: relative; }
+        .reader-controls { display: flex; justify-content: space-between; gap: 1rem; }
+        .reader-controls .btn { flex: 1; padding: 1rem; font-size: 1.1rem; }
+        .modal-header { font-size: 1.25rem; font-weight: 600; margin-bottom: 1.5rem; text-align: center; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; margin-bottom: 0.5rem; font-size: 0.9rem; font-weight: 500; }
+        .form-group input { width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 6px; box-sizing: border-box; }
+        .modal-footer { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.5rem; }
+        .toggle-auth { font-size: 0.85rem; color: var(--primary-color); cursor: pointer; text-align: center; margin-top: 1rem; text-decoration: underline; }
+        .toast-container { position: fixed; bottom: 2rem; right: 2rem; z-index: 2000; display: flex; flex-direction: column; gap: 0.5rem; }
+        .toast { background: #333; color: #fff; padding: 1rem 1.5rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); opacity: 0; animation: slideIn 0.3s forwards, fadeOut 0.3s 2.7s forwards; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
     </style>
 </head>
 <body>
+    <div id="loading-overlay">處理中...請稍候</div>
 
-<div class="container">
-    <div class="main-content">
-        <h2>我的書庫</h2>
-        <div class="book-grid" id="bookGrid"></div>
-    </div>
-</div>
+    <header>
+        <div class="logo"><i class="fa-solid fa-book-open-reader"></i> 智能雲端書庫</div>
+        <div class="user-panel" id="userPanel"><span>載入中...</span></div>
+    </header>
 
-<div id="readerModal">
-    <div class="reader-header">
-        <h3 id="readerTitle">閱讀中...</h3>
-        <button onclick="closeReader()">關閉</button>
-    </div>
-    <div id="viewer"></div>
-</div>
-
-<script>
-    let currentRendition = null;
-
-    async function loadBooks() {
-        const res = await fetch('/books'); // 後端需確保此路由過濾 user_id
-        const books = await res.json();
-        const grid = document.getElementById('bookGrid');
-        grid.innerHTML = books.map(b => `
-            <div class="book-card" onclick="openReader('${b.file_url}', '${b.title}')">
-                <div class="action-btns" onclick="event.stopPropagation()">
-                    <button class="btn" onclick="renameBook('${b.id}', '${b.title}')"><i class="fa fa-pen"></i></button>
-                    <button class="btn" onclick="deleteBook('${b.id}')"><i class="fa fa-trash"></i></button>
+    <div class="container">
+        <div class="sidebar">
+            <div class="sidebar-section">
+                <h3>書籍匯入</h3>
+                <div class="upload-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                    <p>將 EPUB 拖曳至此<br>或點擊上傳</p>
                 </div>
-                <div>${b.title}</div>
+                <div class="upload-actions">
+                    <input type="file" id="fileInput" accept=".epub" multiple onchange="handleFileSelect(this.files)">
+                    <button class="btn btn-outline" onclick="document.getElementById('fileInput').click()">
+                        <i class="fa-solid fa-files"></i> 選擇多個檔案
+                    </button>
+                    <input type="file" id="folderInput" accept=".epub" webkitdirectory directory multiple onchange="handleFileSelect(this.files)">
+                    <button class="btn btn-outline" onclick="document.getElementById('folderInput').click()">
+                        <i class="fa-solid fa-folder-open"></i> 選擇整個資料夾
+                    </button>
+                </div>
             </div>
-        `).join('');
-    }
+            
+            <div class="sidebar-section">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h3 style="margin: 0; border: none; padding: 0;">分流群組</h3>
+                </div>
+                <ul class="category-list" id="seriesList">
+                    <li class="category-item active">全部書籍</li>
+                </ul>
+            </div>
+        </div>
 
-    async function deleteBook(id) {
-        if(!confirm('確定刪除？')) return;
-        await fetch(`/books/${id}`, { method: 'DELETE' });
-        loadBooks();
-    }
+        <div class="main-content">
+            <div class="content-header">
+                <h2 id="currentCategoryTitle">所有書籍</h2>
+                <span id="bookCount" style="color: var(--text-muted); font-size: 0.9rem;">共 0 本</span>
+            </div>
+            <div class="book-grid" id="bookGrid"></div>
+        </div>
+    </div>
 
-    async function renameBook(id, oldTitle) {
-        const newName = prompt('請輸入新名稱:', oldTitle);
-        if(!newName) return;
-        await fetch(`/books/${id}`, { 
-            method: 'PUT', 
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ title: newName }) 
+    <!-- 登入/註冊彈窗 -->
+    <div class="modal" id="authModal">
+        <div class="modal-content">
+            <div class="modal-header" id="modalTitle">會員登入</div>
+            <div class="form-group"><label>帳號</label><input type="text" id="authUser"></div>
+            <div class="form-group"><label>密碼</label><input type="password" id="authPass"></div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeModal('authModal')">取消</button>
+                <button class="btn btn-primary" id="authSubmitBtn" onclick="handleAuthSubmit()">登入</button>
+            </div>
+            <div class="toggle-auth" id="toggleAuthText" onclick="toggleAuthMode()">還沒有帳號？立即註冊</div>
+        </div>
+    </div>
+
+    <!-- EPUB 線上閱讀器彈窗 -->
+    <div class="modal" id="readerModal" style="z-index: 1500;">
+        <div class="modal-content reader-modal-content">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h3 id="readerTitle" style="margin: 0; font-size: 1.25rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">載入中...</h3>
+                <button class="btn btn-outline" onclick="closeReader()" style="padding: 0.5rem 1rem;">
+                    <i class="fa-solid fa-xmark"></i> 關閉閱讀器
+                </button>
+            </div>
+            <div id="viewer"></div>
+            <div class="reader-controls">
+                <button class="btn btn-primary" onclick="if(bookRendition) bookRendition.prev()"><i class="fa-solid fa-chevron-left"></i> 上一頁</button>
+                <button class="btn btn-primary" onclick="if(bookRendition) bookRendition.next()">下一頁 <i class="fa-solid fa-chevron-right"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+        let currentBooks = [];
+        let userInfo = { logged_in: false, username: '', is_admin: false };
+        let isRegisterMode = false;
+        
+        let currentEpub = null;
+        let bookRendition = null;
+
+        window.addEventListener('DOMContentLoaded', () => {
+            checkUserStatus();
+            loadBooks();
+            setupDragAndDrop();
         });
-        loadBooks();
-    }
 
-    function openReader(url, title) {
-        document.getElementById('readerTitle').innerText = title;
-        document.getElementById('readerModal').style.display = 'flex';
-        document.getElementById('viewer').innerHTML = '';
-        const book = ePub(url);
-        currentRendition = book.renderTo("viewer", { width: "100%", height: "100%", flow: "paginated" });
-        currentRendition.display();
-        document.getElementById('viewer').onclick = (e) => {
-            e.pageX < window.innerWidth/2 ? currentRendition.prev() : currentRendition.next();
-        };
-    }
+        async function checkUserStatus() {
+            try {
+                const res = await fetch('/user/status');
+                if (res.ok) {
+                    userInfo = await res.json();
+                    renderUserPanel();
+                }
+            } catch (e) { console.error(e); }
+        }
 
-    function closeReader() {
-        document.getElementById('readerModal').style.display = 'none';
-        if(currentRendition) currentRendition.destroy();
-    }
+        function renderUserPanel() {
+            const panel = document.getElementById('userPanel');
+            if (userInfo.logged_in) {
+                panel.innerHTML = `<span style="margin-right: 15px;"><i class="fa-solid fa-user"></i> ${userInfo.username}</span><button class="btn btn-outline" style="padding: 0.3rem 0.8rem;" onclick="submitLogout()">登出</button>`;
+            } else {
+                panel.innerHTML = `<button class="btn btn-primary" onclick="openAuthModal()">會員登入/註冊</button>`;
+            }
+        }
 
-    window.onload = loadBooks;
-</script>
+        function openAuthModal() {
+            isRegisterMode = false;
+            document.getElementById('modalTitle').innerText = "會員登入";
+            document.getElementById('authSubmitBtn').innerText = "登入";
+            document.getElementById('toggleAuthText').innerText = "還沒有帳號？立即註冊";
+            document.getElementById('authUser').value = "";
+            document.getElementById('authPass').value = "";
+            showModal('authModal');
+        }
+
+        function toggleAuthMode() {
+            isRegisterMode = !isRegisterMode;
+            document.getElementById('modalTitle').innerText = isRegisterMode ? "註冊新帳號" : "會員登入";
+            document.getElementById('authSubmitBtn').innerText = isRegisterMode ? "註冊" : "登入";
+            document.getElementById('toggleAuthText').innerText = isRegisterMode ? "已有帳號？前往登入" : "還沒有帳號？立即註冊";
+        }
+
+        async function handleAuthSubmit() {
+            const overlay = document.getElementById('loading-overlay');
+            const username = document.getElementById('authUser').value.trim();
+            const password = document.getElementById('authPass').value.trim();
+
+            if (!username || !password) { alert("請填寫帳號與密碼！"); return; }
+            overlay.style.display = 'flex';
+            
+            try {
+                const endpoint = isRegisterMode ? '/register' : '/login';
+                const res = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                if (isRegisterMode) {
+                    if (res.ok) { showToast("🟢 註冊成功！請直接登入"); toggleAuthMode(); } 
+                    else { alert("註冊失敗"); }
+                } else {
+                    if (res.ok) {
+                        closeModal('authModal');
+                        showToast("🟢 登入成功！歡迎回來");
+                        await checkUserStatus();
+                        await loadBooks(); 
+                    } else { alert("登入失敗，請檢查您的帳號密碼是否正確！"); }
+                }
+            } catch (e) { console.error(e); } finally { overlay.style.display = 'none'; }
+        }
+
+        async function submitLogout() {
+            await fetch('/logout', { method: 'POST' });
+            showToast("🔒 已安全登出");
+            userInfo = { logged_in: false, username: '', is_admin: false };
+            renderUserPanel();
+            loadBooks(); 
+        }
+
+        async function loadBooks() {
+            try {
+                const res = await fetch('/books');
+                if (res.ok) {
+                    currentBooks = await res.json();
+                    renderBookGrid(currentBooks);
+                    updateSeriesList();
+                }
+            } catch (e) { console.error("載入書籍失敗:", e); }
+        }
+
+        function renderBookGrid(books) {
+            const grid = document.getElementById('bookGrid');
+            document.getElementById('bookCount').innerText = `共 ${books.length} 本`;
+            
+            if (books.length === 0) {
+                grid.innerHTML = `<div style="grid-column: 1/-1; text-align:center; color: #666; padding: 2rem;">目前沒有書籍資料</div>`;
+                return;
+            }
+
+            grid.innerHTML = books.map(b => `
+                <div class="book-card" onclick="openReader('${b.file_url}', '${b.title}')">
+                    <div class="action-btn-wrapper">
+                        <button class="btn-icon" onclick="event.stopPropagation(); editCategory('${b.id}', '${b.series_name || '預設分類'}')" title="更改分類">
+                            <i class="fa-solid fa-pen"></i>
+                        </button>
+                        <button class="btn-danger" onclick="event.stopPropagation(); deleteBook('${b.id}')" title="刪除書籍">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </div>
+                    <div class="book-title" title="${b.title}">${b.title.replace('.epub', '')}</div>
+                    <div style="overflow:hidden;">
+                        <div class="book-category">${b.series_name || '預設分類'}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // 修改分類名稱功能
+        async function editCategory(bookId, currentName) {
+            const newCategory = prompt("請輸入新的分類名稱：", currentName);
+            if (newCategory === null || newCategory.trim() === "") return;
+            
+            const overlay = document.getElementById('loading-overlay');
+            overlay.style.display = 'flex';
+            
+            try {
+                const res = await fetch(`/books/${bookId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ series_name: newCategory.trim() })
+                });
+                
+                if (res.ok) {
+                    showToast("🏷️ 分類名稱已更新");
+                    await loadBooks(); 
+                } else {
+                    alert("更新失敗");
+                }
+            } catch (e) {
+                console.error(e);
+            } finally {
+                overlay.style.display = 'none';
+            }
+        }
+
+        async function deleteBook(bookId) {
+            if (!confirm("確定要刪除這本書嗎？")) return;
+            const overlay = document.getElementById('loading-overlay');
+            overlay.style.display = 'flex';
+            try {
+                const res = await fetch(`/books/${bookId}`, { method: 'DELETE' });
+                if (res.ok) { showToast("🗑️ 書籍已成功刪除"); await loadBooks(); } 
+                else { alert("刪除失敗"); }
+            } catch (e) { console.error(e); } finally { overlay.style.display = 'none'; }
+        }
+
+        // 修復閱讀器白畫面
+        function openReader(fileUrl, title) {
+            document.getElementById('readerTitle').innerText = title.replace('.epub', '');
+            document.getElementById('viewer').innerHTML = ''; 
+            showModal('readerModal');
+            
+            // 延遲執行，確保彈窗 DOM 已經有寬高，epub.js 才能正確計算版面
+            setTimeout(() => {
+                try {
+                    currentEpub = ePub(fileUrl);
+                    bookRendition = currentEpub.renderTo("viewer", {
+                        width: "100%",
+                        height: "100%",
+                        spread: "none"
+                    });
+                    bookRendition.display();
+                } catch(e) {
+                    console.error("渲染 EPUB 發生錯誤:", e);
+                    alert("書籍解析失敗，請確認檔案格式是否正確。");
+                }
+            }, 150);
+        }
+
+        function closeReader() {
+            closeModal('readerModal');
+            if (currentEpub) { currentEpub.destroy(); currentEpub = null; bookRendition = null; }
+        }
+
+        function updateSeriesList() {
+            const list = document.getElementById('seriesList');
+            const categories = ['全部書籍', ...new Set(currentBooks.map(b => b.series_name || '預設分類'))];
+            list.innerHTML = categories.map((cat, idx) => `
+                <li class="category-item ${idx === 0 ? 'active' : ''}" onclick="filterCategory(this, '${cat}')">${cat}</li>
+            `).join('');
+        }
+
+        function filterCategory(element, category) {
+            document.querySelectorAll('.category-item').forEach(el => el.classList.remove('active'));
+            element.classList.add('active');
+            document.getElementById('currentCategoryTitle').innerText = category;
+            
+            if (category === '全部書籍') { renderBookGrid(currentBooks); } 
+            else { renderBookGrid(currentBooks.filter(b => (b.series_name || '預設分類') === category)); }
+        }
+
+        async function handleFileSelect(fileList) {
+            if (fileList.length === 0) return;
+            if (!userInfo.logged_in) { alert("請先登入後再進行上傳！"); openAuthModal(); return; }
+            const overlay = document.getElementById('loading-overlay');
+            overlay.style.display = 'flex'; 
+            try {
+                const formData = new FormData();
+                let validCount = 0;
+                for (let i = 0; i < fileList.length; i++) {
+                    if (fileList[i].name.endsWith('.epub') || fileList[i].type === "application/epub+zip") {
+                        formData.append('file', fileList[i]); validCount++;
+                    }
+                }
+                if (validCount === 0) { alert("請選擇有效的 EPUB 檔案。"); return; }
+                const response = await fetch('/upload', { method: 'POST', body: formData });
+                if (response.ok) { showToast(`🎉 成功上傳 ${validCount} 本書籍！`); loadBooks(); } 
+                else { alert("上傳失敗"); }
+            } catch (e) { console.error(e); } finally { 
+                overlay.style.display = 'none'; 
+                document.getElementById('fileInput').value = '';
+                document.getElementById('folderInput').value = '';
+            }
+        }
+
+        function setupDragAndDrop() {
+            const dropZone = document.getElementById('dropZone');
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => { dropZone.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); }, false); });
+            dropZone.addEventListener('dragover', () => dropZone.style.borderColor = "var(--primary-color)");
+            dropZone.addEventListener('dragleave', () => dropZone.style.borderColor = "#cbd5e0");
+            dropZone.addEventListener('drop', e => { dropZone.style.borderColor = "#cbd5e0"; handleFileSelect(e.dataTransfer.files); });
+        }
+
+        function showModal(id) { document.getElementById(id).style.display = 'flex'; }
+        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+        
+        document.getElementById('authModal').addEventListener('click', function(e) { if(e.target === this) closeModal('authModal'); });
+        document.getElementById('readerModal').addEventListener('click', function(e) { if(e.target === this) closeReader(); });
+
+        function showToast(text) {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = 'toast'; toast.innerHTML = text;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+    </script>
 </body>
 </html>
