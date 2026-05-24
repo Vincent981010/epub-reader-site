@@ -2,92 +2,62 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>智能雲端書庫</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* 保持 index_3.html 的樣式結構 */
-        :root { --primary-color: #3b82f6; --bg-body: #f3f4f6; --bg-panel: #ffffff; }
-        body { font-family: sans-serif; background: var(--bg-body); margin:0; display:flex; flex-direction:column; min-height:100vh; }
-        .container { display: flex; flex: 1; max-width: 1400px; margin: 0 auto; padding: 20px; gap: 20px; }
-        .sidebar { width: 280px; background: var(--bg-panel); padding: 1.5rem; border-radius: 8px; }
-        .main-content { flex: 1; background: var(--bg-panel); padding: 2rem; border-radius: 8px; }
-        .book-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 1.5rem; }
-        .book-card { border: 1px solid #ddd; padding: 1rem; border-radius: 8px; text-align: center; cursor: pointer; position: relative; }
-        .book-checkbox { position: absolute; top: 5px; left: 5px; }
-        .btn { padding: 0.5rem 1rem; border-radius: 6px; border: none; cursor: pointer; }
+        /* 恢復原佈局結構[cite: 1] */
+        body { font-family: sans-serif; margin: 0; background: #f3f4f6; display: flex; flex-direction: column; height: 100vh; }
+        header { display: flex; justify-content: space-between; padding: 1rem 2rem; background: white; border-bottom: 1px solid #ddd; }
+        .container { display: flex; flex: 1; padding: 20px; gap: 20px; }
+        .sidebar { width: 280px; background: white; padding: 1.5rem; border-radius: 8px; }
+        .main-content { flex: 1; background: white; padding: 2rem; border-radius: 8px; }
+        .upload-zone { border: 2px dashed #ccc; padding: 20px; text-align: center; cursor: pointer; margin-bottom: 10px; }
+        .book-grid { display: grid; grid-template-columns: repeat(auto-fill, 160px); gap: 15px; }
+        .book-card { border: 1px solid #ddd; padding: 10px; text-align: center; cursor: pointer; position: relative; }
+        .btn { padding: 8px 12px; margin-bottom: 5px; width: 100%; cursor: pointer; }
     </style>
 </head>
 <body>
+    <header>
+        <div>智能雲端書庫</div>
+        <div id="userPanel">載入中...</div>
+    </header>
     <div class="container">
         <div class="sidebar">
             <h3>書籍匯入</h3>
+            <div class="upload-zone" onclick="document.getElementById('fileInput').click()">
+                將 EPUB 拖曳至此<br>或點擊上傳
+            </div>
             <input type="file" id="fileInput" multiple onchange="handleFileSelect(this.files)" style="display:none">
-            <button class="btn" onclick="document.getElementById('fileInput').click()">上傳 EPUB</button>
+            <button class="btn" onclick="document.getElementById('fileInput').click()">選擇多個檔案</button>
+            <button class="btn" onclick="document.getElementById('folderInput').click()">選擇整個資料夾</button>
+            <input type="file" id="folderInput" webkitdirectory directory multiple onchange="handleFileSelect(this.files)" style="display:none">
+            <h3>分流群組</h3>
+            <div>全部書籍</div>
         </div>
         <div class="main-content">
-            <div style="display:flex; justify-content:space-between; margin-bottom:1rem;">
-                <h2>所有書籍</h2>
-                <div>
-                    <button class="btn" id="selectModeBtn" onclick="toggleSelectionMode()">選取刪除</button>
-                    <button class="btn" id="deleteBtn" style="display:none; background:#ef4444; color:white;" onclick="deleteSelected()">刪除所選</button>
-                </div>
-            </div>
+            <h2>全部書籍</h2>
+            <p>所有書籍</p>
+            <div id="bookCount">共 0 本</div>
             <div class="book-grid" id="bookGrid"></div>
         </div>
     </div>
 
     <script>
-        let isSelectionMode = false;
         let currentBooks = [];
-
-        window.addEventListener('DOMContentLoaded', async () => {
-            await checkUserStatus();
-            await loadBooks();
-        });
-
-        // 修復登入載入迴圈[cite: 1]
-        async function checkUserStatus() {
-            try {
-                await fetch('/user/status');
-            } catch (e) {
-                console.log("狀態檢查失敗，跳過");
-            }
-        }
-
+        
         async function loadBooks() {
-            const res = await fetch('/books');
-            currentBooks = await res.json();
-            renderBookGrid();
+            try {
+                const res = await fetch('/books');
+                currentBooks = await res.json();
+                document.getElementById('bookCount').innerText = `共 ${currentBooks.length} 本`;
+                render();
+            } catch(e) { console.error(e); }
         }
 
-        function toggleSelectionMode() {
-            isSelectionMode = !isSelectionMode;
-            document.getElementById('selectModeBtn').innerText = isSelectionMode ? '取消選取' : '選取刪除';
-            document.getElementById('deleteBtn').style.display = isSelectionMode ? 'block' : 'none';
-            renderBookGrid();
-        }
-
-        function renderBookGrid() {
-            const grid = document.getElementById('bookGrid');
-            grid.innerHTML = currentBooks.map(b => `
-                <div class="book-card" onclick="if(!isSelectionMode) window.open('${b.file_url}', '_blank')">
-                    ${isSelectionMode ? `<input type="checkbox" class="book-checkbox" value="${b.id}">` : ''}
-                    <div>${b.title}</div>
-                </div>
-            `).join('');
-        }
-
-        async function deleteSelected() {
-            const ids = Array.from(document.querySelectorAll('.book-checkbox:checked')).map(cb => cb.value);
-            if(ids.length === 0) return alert("請先勾選");
-            await fetch('/books/delete', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ ids: ids })
-            });
-            await loadBooks(); // 同步更新列表[cite: 1]
-            toggleSelectionMode();
+        function render() {
+            document.getElementById('bookGrid').innerHTML = currentBooks.map(b => 
+                `<div class="book-card" onclick="window.open('${b.file_url}', '_blank')">${b.title}</div>`
+            ).join('');
         }
 
         async function handleFileSelect(files) {
@@ -96,6 +66,16 @@
             await fetch('/upload', { method: 'POST', body: formData });
             loadBooks();
         }
+
+        // 修復載入迴圈[cite: 1]
+        window.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const res = await fetch('/user/status');
+                const data = await res.json();
+                document.getElementById('userPanel').innerText = data.logged_in ? "已登入" : "未登入";
+            } catch { document.getElementById('userPanel').innerText = "未登入"; }
+            loadBooks();
+        });
     </script>
 </body>
 </html>
