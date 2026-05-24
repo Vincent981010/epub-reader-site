@@ -3,47 +3,91 @@
 <head>
     <meta charset="UTF-8">
     <title>智能雲端書庫</title>
+    <!-- 請確保這裡有你原本的 CSS 連結或樣式，上方是為了補全架構 -->
     <style>
+        /* 保持你原本的 CSS 樣式，這裡新增 Loading 遮罩 */
         #loading-overlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.8); z-index:9999; justify-content:center; align-items:center; }
-        .container { display: flex; padding: 20px; }
-        #bookGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 15px; width: 100%; }
-        .book-card { border: 1px solid #ccc; padding: 10px; }
+        .toast-container { position: fixed; bottom: 2rem; right: 2rem; z-index: 1000; }
+        .modal { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); justify-content:center; align-items:center; }
     </style>
 </head>
 <body>
     <div id="loading-overlay">處理中...請稍候</div>
 
+    <!-- 你的原始 HTML 結構 (Header, Sidebar, Main Content) -->
     <header>
-        <h1>智能雲端書庫</h1>
-        <div id="auth">
-            <input type="text" id="u" placeholder="帳號"><input type="password" id="p" placeholder="密碼">
-            <button onclick="handleLogin(document.getElementById('u').value, document.getElementById('p').value)">登入</button>
-        </div>
+        <div class="logo"><i class="fa-solid fa-book-open-reader"></i> 智能雲端書庫</div>
+        <div class="user-panel" id="userPanel"><span>載入中...</span></div>
     </header>
 
     <div class="container">
-        <aside style="width: 200px;"><h3>分類列表</h3><div id="seriesList"></div></aside>
-        <main id="bookGrid"></main>
+        <div class="sidebar">
+            <div class="sidebar-section">
+                <h3>書籍匯入</h3>
+                <div class="upload-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                    <p>將 EPUB 拖曳至此<br>或點擊上傳</p>
+                </div>
+                <div class="upload-actions">
+                    <input type="file" id="fileInput" accept=".epub" multiple onchange="handleFileSelect(this.files)">
+                    <button class="btn btn-outline" onclick="document.getElementById('fileInput').click()">選擇檔案</button>
+                </div>
+            </div>
+            <div class="sidebar-section">
+                <h3>分流群組</h3>
+                <ul class="category-list" id="seriesList"></ul>
+            </div>
+        </div>
+        <div class="main-content">
+            <div class="book-grid" id="bookGrid"></div>
+        </div>
+    </div>
+
+    <!-- 驗證彈窗 -->
+    <div class="modal" id="authModal">
+        <div class="modal-content">
+            <h3 id="modalTitle">會員登入</h3>
+            <input type="text" id="authUser" placeholder="帳號">
+            <input type="password" id="authPass" placeholder="密碼">
+            <button onclick="handleAuthSubmit()">確認</button>
+            <p id="toggleAuthText" onclick="toggleAuthMode()">還沒有帳號？註冊</p>
+        </div>
     </div>
 
     <script>
-        async function handleLogin(username, password) {
+        // 核心邏輯：優化後的 Auth 與上傳
+        async function handleAuthSubmit() {
             const overlay = document.getElementById('loading-overlay');
-            overlay.style.display = 'flex';
+            overlay.style.display = 'flex'; // 顯示 Loading，防止卡住
+            
+            const username = document.getElementById('authUser').value;
+            const password = document.getElementById('authPass').value;
+            const isReg = document.getElementById('modalTitle').innerText.includes("註冊");
+
             try {
-                const res = await fetch('/login', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({username, password})});
-                if((await res.json()).status === 'success') window.location.reload();
-                else alert("登入失敗");
-            } finally { overlay.style.display = 'none'; }
+                const res = await fetch(isReg ? '/register' : '/login', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({username, password})
+                });
+                if(res.ok) {
+                    window.location.reload(); // 成功後重整，確保 session 生效
+                } else {
+                    alert("操作失敗");
+                }
+            } finally {
+                overlay.style.display = 'none'; // 關鍵：無論成功失敗都要關閉
+            }
         }
 
         async function loadBooks() {
+            // 這裡會呼叫後端的 /books，後端會根據 session['user'] 篩選
             const res = await fetch('/books');
             const books = await res.json();
-            document.getElementById('bookGrid').innerHTML = books.map(b => 
-                `<div class="book-card"><strong>${b.title}</strong><p>${b.series_name || '預設分類'}</p></div>`
-            ).join('');
+            const grid = document.getElementById('bookGrid');
+            grid.innerHTML = books.map(b => `<div class="book-card">${b.title}</div>`).join('');
         }
+
         window.onload = loadBooks;
     </script>
 </body>
