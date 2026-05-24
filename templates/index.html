@@ -8,35 +8,33 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/epub.js/0.3.88/epub.min.js"></script>
     <style>
-        :root { --primary-color: #3b82f6; --text-main: #1f2937; --bg-body: #f3f4f6; --bg-panel: #ffffff; }
-        body { font-family: 'Segoe UI', sans-serif; margin: 0; background-color: var(--bg-body); }
-        
-        /* 閱讀器樣式：Wenku8 風格 */
+        :root { --primary-color: #3b82f6; --text-main: #1f2937; --bg-body: #f3f4f6; --bg-panel: #ffffff; --border-color: #e5e7eb; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; background-color: var(--bg-body); color: var(--text-main); }
+        header { background: var(--bg-panel); padding: 1rem 2rem; display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); }
+        .container { display: flex; max-width: 1400px; margin: 20px auto; gap: 20px; padding: 0 20px; }
+        .sidebar { width: 280px; background: var(--bg-panel); padding: 1.5rem; border-radius: 8px; }
+        .main-content { flex: 1; background: var(--bg-panel); padding: 2rem; border-radius: 8px; }
+        .book-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1.5rem; }
+        .book-card { border: 1px solid var(--border-color); padding: 1.2rem; border-radius: 8px; cursor: pointer; transition: 0.2s; }
+        .book-card:hover { border-color: var(--primary-color); }
+
+        /* Wenku8 風格閱讀器樣式 */
         .reader-modal-content {
-            background: #fdf6ec !important; /* 護眼暖色背景 */
+            background: #fdf6ec !important; /* 暖色護眼背景 */
             color: #333 !important;
             max-width: 100vw !important;
             height: 100vh !important;
-            padding: 2rem !important;
-            box-sizing: border-box;
+            padding: 0 !important;
+            display: flex;
+            flex-direction: column;
         }
         #viewer {
             flex: 1;
-            background: transparent !important;
-            border: none !important;
-            padding: 0 15% !important; /* 內文寬度限制 */
+            padding: 3rem 20% !important; /* 模擬書籍內文寬度 */
             cursor: pointer;
+            overflow-y: auto;
         }
-        .reader-header { display: flex; justify-content: space-between; padding-bottom: 1rem; border-bottom: 1px solid #dcdcdc; }
-
-        /* 原有介面樣式 */
-        header { background: var(--bg-panel); padding: 1rem 2rem; display: flex; justify-content: space-between; border-bottom: 1px solid #e5e7eb; }
-        .container { display: flex; max-width: 1200px; margin: 20px auto; padding: 20px; gap: 20px; }
-        .sidebar { width: 280px; background: var(--bg-panel); padding: 1.5rem; border-radius: 8px; }
-        .main-content { flex: 1; background: var(--bg-panel); padding: 2rem; border-radius: 8px; }
-        .book-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 1.5rem; }
-        .book-card { border: 1px solid #e5e7eb; padding: 1rem; text-align: center; cursor: pointer; border-radius: 8px; transition: 0.2s; }
-        .book-card:hover { border-color: var(--primary-color); }
+        .reader-header { padding: 1rem; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center; }
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center; }
     </style>
 </head>
@@ -44,24 +42,26 @@
 
     <header>
         <div class="logo"><i class="fa-solid fa-book-open-reader"></i> 智能雲端書庫</div>
+        <div id="userPanel"></div>
     </header>
 
     <div class="container">
         <div class="sidebar">
             <h3>書籍列表</h3>
-            <div id="bookList"></div>
+            <div id="bookGrid"></div>
         </div>
         <div class="main-content">
-            <div class="book-grid" id="bookGrid"></div>
+            <h2 id="currentCategoryTitle">所有書籍</h2>
+            <div class="book-grid" id="bookGridContent"></div>
         </div>
     </div>
 
-    <!-- 閱讀器彈窗 -->
+    <!-- 閱讀器彈窗 (Wenku8 風格) -->
     <div class="modal" id="readerModal">
         <div class="modal-content reader-modal-content">
             <div class="reader-header">
                 <h3 id="readerTitle" style="margin:0;">載入中...</h3>
-                <button onclick="closeReader()" style="border:none; background:none; cursor:pointer; font-size:1.2rem;">✕</button>
+                <button onclick="closeReader()" style="background:none; border:none; cursor:pointer; font-size:1.5rem;">✕</button>
             </div>
             <div id="viewer"></div>
         </div>
@@ -71,19 +71,17 @@
         let currentEpub = null;
         let bookRendition = null;
 
-        // 初始化：載入書籍
         async function loadBooks() {
             const res = await fetch('/books');
             const books = await res.json();
-            const grid = document.getElementById('bookGrid');
+            const grid = document.getElementById('bookGridContent');
             grid.innerHTML = books.map(b => `
                 <div class="book-card" onclick="openReader('${b.file_url}', '${b.title}')">
-                    <div>${b.title.replace('.epub', '')}</div>
+                    <div style="font-weight:bold;">${b.title.replace('.epub', '')}</div>
                 </div>
             `).join('');
         }
 
-        // Wenku8 風格閱讀器
         function openReader(fileUrl, title) {
             document.getElementById('readerTitle').innerText = title.replace('.epub', '');
             document.getElementById('viewer').innerHTML = ''; 
@@ -95,16 +93,18 @@
                     bookRendition = currentEpub.renderTo("viewer", {
                         width: "100%",
                         height: "100%",
-                        spread: "none"
+                        spread: "none",
+                        flow: "paginated"
                     });
                     
                     bookRendition.display();
 
-                    // 點擊翻頁：左側上一頁，右側下一頁
+                    // Wenku8 翻頁邏輯：點擊螢幕左側上一頁，右側下一頁
                     bookRendition.on('click', (e) => {
                         const mid = window.innerWidth / 2;
                         e.pageX < mid ? bookRendition.prev() : bookRendition.next();
                     });
+
                 } catch(e) {
                     alert("解析失敗");
                 }
