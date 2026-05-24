@@ -8,14 +8,13 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/epub.js/0.3.88/epub.min.js"></script>
     <style>
-        :root { --primary-color: #3b82f6; --bg-body: #f3f4f6; --bg-panel: #ffffff; --border-color: #e5e7eb; }
+        :root { --primary-color: #3b82f6; --text-main: #1f2937; --bg-body: #f3f4f6; --bg-panel: #ffffff; --border-color: #e5e7eb; }
         body { font-family: sans-serif; margin: 0; background-color: var(--bg-body); }
         .container { display: flex; max-width: 1400px; margin: auto; padding: 20px; gap: 20px; }
-        .sidebar { width: 280px; background: var(--bg-panel); padding: 1.5rem; border-radius: 8px; }
         .main-content { flex: 1; background: var(--bg-panel); padding: 2rem; border-radius: 8px; }
         .book-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1.5rem; }
-        .book-card { border: 1px solid var(--border-color); padding: 1rem; border-radius: 8px; cursor: pointer; position: relative; }
-        .action-btns { position: absolute; top: 5px; right: 5px; display: flex; gap: 5px; }
+        .book-card { border: 1px solid var(--border-color); padding: 1rem; border-radius: 8px; cursor: pointer; position: relative; background: #fff; }
+        .action-btns { position: absolute; top: 5px; right: 5px; display: flex; gap: 5px; z-index: 10; }
         .btn { padding: 5px 10px; cursor: pointer; border: 1px solid var(--border-color); background: #fff; border-radius: 4px; }
         
         /* Wenku8 風格閱讀器 */
@@ -27,13 +26,8 @@
 <body>
 
 <div class="container">
-    <div class="sidebar">
-        <h3>書籍管理</h3>
-        <button class="btn" onclick="document.getElementById('fileInput').click()">上傳 EPUB</button>
-        <input type="file" id="fileInput" style="display:none" onchange="handleFileUpload(this.files)">
-    </div>
     <div class="main-content">
-        <h2 id="currentCategoryTitle">我的書庫</h2>
+        <h2>我的書庫</h2>
         <div class="book-grid" id="bookGrid"></div>
     </div>
 </div>
@@ -50,7 +44,7 @@
     let currentRendition = null;
 
     async function loadBooks() {
-        const res = await fetch('/books');
+        const res = await fetch('/books'); // 後端需確保此路由過濾 user_id
         const books = await res.json();
         const grid = document.getElementById('bookGrid');
         grid.innerHTML = books.map(b => `
@@ -60,7 +54,6 @@
                     <button class="btn" onclick="deleteBook('${b.id}')"><i class="fa fa-trash"></i></button>
                 </div>
                 <div>${b.title}</div>
-                <div style="font-size:0.8rem; color:#666;">分類: ${b.series_name || '無'}</div>
             </div>
         `).join('');
     }
@@ -86,12 +79,9 @@
         document.getElementById('readerTitle').innerText = title;
         document.getElementById('readerModal').style.display = 'flex';
         document.getElementById('viewer').innerHTML = '';
-        
-        // 修復讀取失敗：使用絕對路徑並確保伺服器回傳路徑正確
         const book = ePub(url);
         currentRendition = book.renderTo("viewer", { width: "100%", height: "100%", flow: "paginated" });
         currentRendition.display();
-        
         document.getElementById('viewer').onclick = (e) => {
             e.pageX < window.innerWidth/2 ? currentRendition.prev() : currentRendition.next();
         };
@@ -99,13 +89,7 @@
 
     function closeReader() {
         document.getElementById('readerModal').style.display = 'none';
-    }
-
-    async function handleFileUpload(files) {
-        const formData = new FormData();
-        formData.append('file', files[0]);
-        await fetch('/upload', { method: 'POST', body: formData });
-        loadBooks();
+        if(currentRendition) currentRendition.destroy();
     }
 
     window.onload = loadBooks;
